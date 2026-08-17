@@ -19,6 +19,9 @@ class UniversalObject(models.Model):
         abstract = True
 
 
+def default_modules():
+    return ["education_core", "finance", "communication"]
+
 class Organization(UniversalObject):
     """
     Objet Universel : Organisation.
@@ -27,6 +30,7 @@ class Organization(UniversalObject):
     name = models.CharField(max_length=255)
     legal_name = models.CharField(max_length=255, blank=True)
     registration_number = models.CharField(max_length=100, blank=True)
+    active_modules = models.JSONField(default=default_modules, help_text="Liste des modules actifs pour cette organisation")
 
     def __str__(self):
         return self.name

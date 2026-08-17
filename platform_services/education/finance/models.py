@@ -30,6 +30,15 @@ class Payment(TenantModel):
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     date = models.DateTimeField(auto_now_add=True)
     receipt_number = models.CharField(max_length=50, unique=True, blank=True)
+    PAYMENT_METHODS = (
+        ('ESP', 'Espèces'),
+        ('MOMO', 'Mobile Money'),
+        ('VIR', 'Virement Bancaire'),
+        ('CHQ', 'Chèque'),
+    )
+    payment_method = models.CharField(max_length=10, choices=PAYMENT_METHODS, default='ESP')
+    reference_number_trans = models.CharField(max_length=100, blank=True, null=True, help_text="Numéro de chèque ou ID de transaction")
+    
     recorded_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
 
     class Meta:

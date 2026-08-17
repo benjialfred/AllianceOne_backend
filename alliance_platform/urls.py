@@ -17,6 +17,8 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 from django.http import JsonResponse
+from django.conf import settings
+from django.conf.urls.static import static
 
 def api_root(request):
     return JsonResponse({
@@ -31,4 +33,11 @@ urlpatterns = [
     path('api/core/identity/', include('platform_services.identity.urls')),
     path('api/core/dashboards/', include('platform_services.dashboards.api.urls')),
     path('api/education/', include('platform_services.education.api.urls')),
+    path('api/inventory/', include('platform_services.inventory.urls')),
+    path('api/library/', include('platform_services.library.urls')),
+    path('api/finance/', include('platform_services.finance.urls')),
+    path('api/tasks/', include('platform_services.tasks.urls')),
 ]
+
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

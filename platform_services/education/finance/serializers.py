@@ -5,7 +5,7 @@ from platform_services.education.students.serializers import StudentSerializer
 class PaymentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Payment
-        fields = ('id', 'tuition_profile', 'amount', 'date', 'receipt_number', 'recorded_by')
+        fields = ('id', 'tuition_profile', 'amount', 'date', 'receipt_number', 'payment_method', 'reference_number_trans', 'recorded_by')
         read_only_fields = ('id', 'date', 'receipt_number', 'recorded_by')
 
 class TuitionProfileSerializer(serializers.ModelSerializer):

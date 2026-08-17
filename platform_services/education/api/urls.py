@@ -2,7 +2,7 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 
 from platform_services.education.students.views import StudentViewSet, AttendanceViewSet, EnrollmentViewSet
-from platform_services.education.classes.views import SchoolClassViewSet, AcademicYearViewSet, AcademicEventViewSet, LevelViewSet, SectionViewSet
+from platform_services.education.classes.views import SchoolClassViewSet, AcademicYearViewSet, AcademicEventViewSet, LevelViewSet, SectionViewSet, SeriesGroupViewSet, SeriesViewSet
 from platform_services.education.teachers.views import TeacherViewSet
 from platform_services.education.subjects.views import SubjectViewSet
 from platform_services.education.grades.views import GradeViewSet, SequenceValidationViewSet, GradeHistoryViewSet
@@ -15,6 +15,8 @@ router.register(r'attendances', AttendanceViewSet, basename='attendance')
 router.register(r'classes', SchoolClassViewSet, basename='schoolclass')
 router.register(r'levels', LevelViewSet, basename='level')
 router.register(r'sections', SectionViewSet, basename='section')
+router.register(r'series-groups', SeriesGroupViewSet, basename='seriesgroup')
+router.register(r'series', SeriesViewSet, basename='series')
 router.register(r'academic-years', AcademicYearViewSet, basename='academicyear')
 router.register(r'academic-events', AcademicEventViewSet, basename='academicevent')
 router.register(r'teachers', TeacherViewSet, basename='teacher')

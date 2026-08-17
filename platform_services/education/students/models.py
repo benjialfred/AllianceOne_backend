@@ -38,7 +38,7 @@ class Student(TenantModel):
         if not self.matricule:
             import datetime
             year = str(datetime.datetime.now().year)
-            # Find the last student created this year
+            # Trouver le dernier étudiant de cette année
             last_student = Student.objects.filter(matricule__startswith=f"{year}-").order_by('-matricule').first()
             if last_student:
                 try:
@@ -48,7 +48,14 @@ class Student(TenantModel):
                     new_num = 1
             else:
                 new_num = 1
-            self.matricule = f"{year}-{new_num:05d}" # 4 chars year + 1 char dash + 5 chars num = 10 chars
+            
+            # Garantir l'unicité
+            candidate_matricule = f"{year}-{new_num:05d}"
+            while Student.objects.filter(matricule=candidate_matricule).exists():
+                new_num += 1
+                candidate_matricule = f"{year}-{new_num:05d}"
+                
+            self.matricule = candidate_matricule
         super().save(*args, **kwargs)
 
 
@@ -95,3 +102,24 @@ class Attendance(TenantModel):
     def __str__(self):
         status = "Absent" if self.is_absent else "Présent"
         return f"{self.student} - {self.date} - {status}"
+
+
+from django.db.models.signals import post_save
+from django.dispatch import receiver
+
+@receiver(post_save, sender=Enrollment)
+def create_or_update_tuition_profile(sender, instance, created, **kwargs):
+    from platform_services.education.finance.models import TuitionProfile
+    # Update or create tuition profile for the student and academic year
+    tp, tp_created = TuitionProfile.objects.get_or_create(
+        student=instance.student,
+        academic_year=instance.academic_year,
+        defaults={
+            'organization_id': getattr(instance, 'organization_id', None),
+            'total_amount': instance.school_class.tuition_fee
+        }
+    )
+    if not tp_created and tp.total_amount != instance.school_class.tuition_fee:
+        # Only update if no payments have been made? Or just update it.
+        tp.total_amount = instance.school_class.tuition_fee
+        tp.save(update_fields=['total_amount'])

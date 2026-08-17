@@ -29,14 +29,11 @@ class GradeViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
         if CalendarEngine.are_grades_locked(timezone.now().date(), organization_id=org_id):
             return True
 
-        if not student.school_class:
-            # Need to get class from enrollment now
-            enrollment = student.enrollments.filter(academic_year_id=academic_year_id).first()
-            if not enrollment:
-                return False
-            school_class = enrollment.school_class
-        else:
-            school_class = student.school_class
+        # Need to get class from enrollment now
+        enrollment = student.enrollments.filter(academic_year_id=academic_year_id).first()
+        if not enrollment:
+            return False
+        school_class = enrollment.school_class
 
         validation = SequenceValidation.objects.filter(
             school_class=school_class,
@@ -183,6 +180,138 @@ class GradeViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
             'updated': updated,
             'errors': errors
         })
+
+    @action(detail=False, methods=['post'])
+    def import_grades(self, request):
+        if 'file' not in request.FILES:
+            return Response({'error': 'Aucun fichier fourni.'}, status=400)
+            
+        school_class_id = request.data.get('school_class')
+        subject_id = request.data.get('subject')
+        sequence = request.data.get('sequence')
+        academic_year_id = request.data.get('academic_year')
+        evaluation_type = request.data.get('evaluation_type')
+        teacher_id = request.data.get('teacher')
+        
+        if not all([school_class_id, subject_id, sequence, academic_year_id, evaluation_type]):
+            return Response({'error': 'Veuillez fournir la classe, la matière, la séquence, l\'année académique et le type d\'évaluation.'}, status=400)
+            
+        file = request.FILES['file']
+        
+        created = 0
+        updated = 0
+        errors = []
+        parsed_data = [] # list of dicts: {'identifier': str, 'note': float}
+        
+        try:
+            if file.name.endswith('.xlsx'):
+                import openpyxl
+                wb = openpyxl.load_workbook(file, data_only=True)
+                ws = wb.active
+                for row_idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
+                    if not row or not row[0]: continue
+                    # Assuming format: Matricule/Nom | ... | Note
+                    # We will try to find a float in the row, preferably at the end, and string at the beginning
+                    identifier = str(row[0]).strip()
+                    note = None
+                    for cell in reversed(row):
+                        if cell is not None:
+                            try:
+                                note = float(cell)
+                                break
+                            except:
+                                pass
+                    if note is not None:
+                        parsed_data.append({'identifier': identifier, 'note': note, 'row': row_idx})
+                    else:
+                        errors.append(f"Ligne {row_idx} : Note invalide ou introuvable.")
+            elif file.name.endswith('.docx'):
+                from docx import Document
+                doc = Document(file)
+                if doc.tables:
+                    table = doc.tables[0]
+                    for row_idx, row in enumerate(table.rows):
+                        if row_idx == 0: continue # header
+                        if len(row.cells) >= 2:
+                            identifier = row.cells[0].text.strip()
+                            note_text = row.cells[-1].text.strip().replace(',', '.')
+                            if not identifier: continue
+                            try:
+                                note = float(note_text)
+                                parsed_data.append({'identifier': identifier, 'note': note, 'row': row_idx + 1})
+                            except:
+                                errors.append(f"Ligne {row_idx + 1} (Word) : Note '{note_text}' invalide.")
+                else:
+                    return Response({'error': 'Le fichier Word ne contient aucun tableau.'}, status=400)
+            else:
+                return Response({'error': 'Format non supporté. Utilisez .xlsx ou .docx'}, status=400)
+                
+            from platform_services.education.students.models import Student
+            
+            # Fetch all students in that class for the academic year
+            students = Student.objects.filter(enrollments__school_class_id=school_class_id, enrollments__academic_year_id=academic_year_id).distinct()
+            
+            for item in parsed_data:
+                identifier = item['identifier'].lower()
+                note = item['note']
+                if note < 0 or note > 20:
+                    errors.append(f"Ligne {item['row']} : Note {note} hors limites (0-20).")
+                    continue
+                    
+                # Match student
+                matched_student = None
+                for s in students:
+                    if s.matricule and s.matricule.lower() == identifier:
+                        matched_student = s
+                        break
+                    if s.last_name.lower() in identifier or s.first_name.lower() in identifier or identifier in f"{s.first_name} {s.last_name}".lower() or identifier in f"{s.last_name} {s.first_name}".lower():
+                        matched_student = s
+                        break
+                        
+                if not matched_student:
+                    errors.append(f"Ligne {item['row']} : Élève '{item['identifier']}' introuvable dans la classe.")
+                    continue
+                    
+                if self.check_is_locked(matched_student, academic_year_id, sequence):
+                    errors.append(f"Ligne {item['row']} : Saisie verrouillée pour {matched_student.last_name}.")
+                    continue
+                    
+                grade_obj, is_new = Grade.objects.get_or_create(
+                    student=matched_student,
+                    subject_id=subject_id,
+                    sequence=sequence,
+                    academic_year_id=academic_year_id,
+                    evaluation_type=evaluation_type,
+                    defaults={
+                        'teacher_id': teacher_id or getattr(self.request.user, 'teacher_id', None),
+                        'value': note
+                    }
+                )
+                
+                if not is_new:
+                    if float(grade_obj.value) != note:
+                        GradeHistory.objects.create(
+                            grade=grade_obj,
+                            old_value=grade_obj.value,
+                            new_value=note,
+                            reason="Importation fichier (mise à jour)",
+                            changed_by=self.request.user
+                        )
+                        grade_obj.value = note
+                        if teacher_id: grade_obj.teacher_id = teacher_id
+                        grade_obj.save()
+                        updated += 1
+                else:
+                    created += 1
+                    
+            return Response({
+                'message': f'Import terminé. {created} créées, {updated} mises à jour.',
+                'created': created,
+                'updated': updated,
+                'errors': errors
+            })
+        except Exception as e:
+            return Response({'error': str(e)}, status=500)
 
 
 class GradeHistoryViewSet(viewsets.ReadOnlyModelViewSet):

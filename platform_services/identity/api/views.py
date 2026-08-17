@@ -32,6 +32,15 @@ def get_available_modules(request):
                 }
             ],
             'events': {'emits': [], 'listens': ['Education:OpenNewStudentModal']}
+        },
+        {
+            'id': 'library',
+            'name': 'Bibliothèque',
+            'version': '1.0.0',
+            'description': 'Gestion des prêts et du catalogue',
+            'routes': [],
+            'commands': [],
+            'events': {'emits': [], 'listens': []}
         }
     ]
     return Response(modules)

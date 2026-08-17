@@ -6,8 +6,8 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 
 
-from .models import AcademicYear, SchoolClass, AcademicEvent, Level, Section
-from .serializers import AcademicYearSerializer, SchoolClassSerializer, AcademicEventSerializer, LevelSerializer, SectionSerializer
+from .models import AcademicYear, SchoolClass, AcademicEvent, Level, Section, SeriesGroup, Series
+from .serializers import AcademicYearSerializer, SchoolClassSerializer, AcademicEventSerializer, LevelSerializer, SectionSerializer, SeriesGroupSerializer, SeriesSerializer
 from .services import promote_students, PromotionEngine
 
 class LevelViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
@@ -17,6 +17,14 @@ class LevelViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
 class SectionViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
     queryset = Section.objects.all()
     serializer_class = SectionSerializer
+
+class SeriesGroupViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
+    queryset = SeriesGroup.objects.all()
+    serializer_class = SeriesGroupSerializer
+
+class SeriesViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
+    queryset = Series.objects.select_related('group').all()
+    serializer_class = SeriesSerializer
 class AcademicYearViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
     queryset = AcademicYear.objects.all()
     serializer_class = AcademicYearSerializer

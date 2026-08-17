@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from .models import AcademicYear, SchoolClass, AcademicEvent, Level, Section
+from .models import AcademicYear, SchoolClass, AcademicEvent, Level, Section, SeriesGroup, Series
 
 class AcademicYearSerializer(serializers.ModelSerializer):
     class Meta:
@@ -18,13 +18,25 @@ class SectionSerializer(serializers.ModelSerializer):
         model = Section
         fields = ('id', 'name')
 
+class SeriesGroupSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SeriesGroup
+        fields = ('id', 'name')
+
+class SeriesSerializer(serializers.ModelSerializer):
+    group_details = SeriesGroupSerializer(source='group', read_only=True)
+    class Meta:
+        model = Series
+        fields = ('id', 'name', 'group', 'group_details')
+
 class SchoolClassSerializer(serializers.ModelSerializer):
     level_details = LevelSerializer(source='level', read_only=True)
     section_details = SectionSerializer(source='section', read_only=True)
+    series_details = SeriesSerializer(source='series', read_only=True)
     
     class Meta:
         model = SchoolClass
-        fields = ('id', 'name', 'level', 'level_details', 'section', 'section_details', 'academic_year', 'head_teacher', 'subjects', 'capacity')
+        fields = ('id', 'name', 'level', 'level_details', 'section', 'section_details', 'series', 'series_details', 'academic_year', 'head_teacher', 'subjects', 'capacity', 'tuition_fee')
         read_only_fields = ('id',)
 
 class AcademicEventSerializer(serializers.ModelSerializer):

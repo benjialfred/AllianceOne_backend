@@ -45,7 +45,7 @@ def get_sequence_average(student_id, academic_year_id, sequence):
     return total_points / total_coef if total_coef > 0 else 0.0
 
 def get_class_stats(class_id, academic_year_id, sequence):
-    students = Student.objects.filter(school_class_id=class_id)
+    students = Student.objects.filter(enrollments__school_class_id=class_id, enrollments__academic_year_id=academic_year_id).distinct()
     averages = []
     for s in students:
         avg = get_sequence_average(s.id, academic_year_id, sequence)
@@ -72,7 +72,10 @@ def calculate_student_bulletin(student_id, academic_year_id, sequence):
         query_sequence = 'seq6'
         display_sequence = 'Trimestre 3'
         
-    student = Student.objects.select_related('school_class', 'school_class__head_teacher').get(pk=student_id)
+    student = Student.objects.get(pk=student_id)
+    enrollment = student.enrollments.filter(academic_year_id=academic_year_id).select_related('school_class', 'school_class__head_teacher').first()
+    if not enrollment:
+        raise ValueError("L'élève n'est pas inscrit pour cette année académique.")
     
     # School settings
     settings = student.organization
@@ -174,7 +177,7 @@ def calculate_student_bulletin(student_id, academic_year_id, sequence):
     general_average = total_points / total_coef if total_coef > 0 else 0.0
     
     # Class stats
-    class_averages, class_average, class_max, class_min = get_class_stats(student.school_class_id, academic_year_id, query_sequence)
+    class_averages, class_average, class_max, class_min = get_class_stats(enrollment.school_class_id, academic_year_id, query_sequence)
     rank = 1
     for r, (s_id, avg) in enumerate(class_averages, 1):
         if s_id == student_id:
@@ -227,7 +230,7 @@ def calculate_student_bulletin(student_id, academic_year_id, sequence):
         moy_trim = (seq1_avg + seq2_avg) / 2 if seq1_avg > 0 else seq2_avg
 
     # Student info for convenience
-    head_teacher = student.school_class.head_teacher
+    head_teacher = enrollment.school_class.head_teacher
     head_teacher_name = f"{head_teacher.first_name} {head_teacher.last_name}" if head_teacher else "Non assigné"
 
     return {
@@ -237,8 +240,8 @@ def calculate_student_bulletin(student_id, academic_year_id, sequence):
         'student_sex': student.sex,
         'student_date_of_birth': str(student.date_of_birth),
         'student_place_of_birth': student.place_of_birth,
-        'student_class_name': student.school_class.name,
-        'student_class_section': student.school_class.section,
+        'student_class_name': enrollment.school_class.name,
+        'student_class_section': enrollment.school_class.section,
         'head_teacher_name': head_teacher_name,
         'sequence': display_sequence,
         'academic_year_id': academic_year_id,

@@ -30,9 +30,18 @@ environ.Env.read_env(BASE_DIR / '.env')
 SECRET_KEY = env('SECRET_KEY', default='django-insecure-6ijxfdpz3-bdbm9b1qt2t0!xh)j90kiu6h*eje!!cgt*09u9ph')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = env('DEBUG')
+DEBUG = env.bool('DEBUG', default=False)
 
-ALLOWED_HOSTS: list[str] = []
+ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['*'])
+
+CSRF_TRUSTED_ORIGINS = env.list('CSRF_TRUSTED_ORIGINS', default=[
+    'https://*.onrender.com',
+    'https://*.vercel.app',
+    'http://localhost:5173',
+    'http://localhost:3000',
+    'http://127.0.0.1:5173',
+    'http://127.0.0.1:3000',
+])
 
 
 # Application definition
@@ -62,6 +71,10 @@ INSTALLED_APPS = [
     'platform_services.education.finance',
     'platform_services.education.cards',
     'platform_services.education.core',
+    'platform_services.inventory',
+    'platform_services.library',
+    'platform_services.finance',
+    'platform_services.tasks',
 ]
 
 MIDDLEWARE = [
@@ -75,7 +88,7 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'platform_services.identity.middleware.TenantMiddleware',
-    'platform_services.education.middleware.EducationErrorTrackingMiddleware',
+    'alliance_platform.middleware.ErrorTrackingMiddleware',
 ]
 
 ROOT_URLCONF = 'alliance_platform.urls'
