@@ -48,7 +48,7 @@ class AgentOrchestrator:
         # checks ApprovalEngine.evaluate_risk(), and if safe, calls ToolRegistry.execute_tool().
         
         # For the V1 Backend Mock, we'll simulate a successful loop:
-        response_text = provider.execute_tool_call_loop(messages, allowed_tools_schema, ToolRegistry)
+        response_text = provider.execute_tool_call_loop(messages, allowed_tools_schema, ToolRegistry, context)
         
         # 5. Log the interaction to the EventBus (Audit)
         # EventBus.publish(AIInteractionEvent(...))

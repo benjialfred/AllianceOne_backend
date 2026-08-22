@@ -1,5 +1,5 @@
 from typing import Dict
-from .providers import LLMProvider, MockProvider
+from .providers import LLMProvider, MockProvider, OllamaProvider
 
 class ModelRouter:
     """
@@ -8,9 +8,9 @@ class ModelRouter:
     def __init__(self):
         self._providers: Dict[str, LLMProvider] = {
             "mock_local": MockProvider(),
-            # Future: "gemini": GeminiProvider(), "openai": OpenAIProvider()
+            "ollama": OllamaProvider(model_name="llama3.1"),
         }
-        self._default_provider = "mock_local"
+        self._default_provider = "ollama"
 
     def register_provider(self, provider: LLMProvider):
         self._providers[provider.provider_name] = provider
