@@ -32,6 +32,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/core/identity/', include('platform_services.identity.urls')),
     path('api/core/dashboards/', include('platform_services.dashboards.api.urls')),
+    path('api/core/ai/', include('platform_services.alliance_ai.urls')),
     path('api/education/', include('platform_services.education.api.urls')),
     path('api/inventory/', include('platform_services.inventory.urls')),
     path('api/library/', include('platform_services.library.urls')),
