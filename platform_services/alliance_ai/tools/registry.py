@@ -36,9 +36,12 @@ class ToolRegistry:
             # Filter tools by permissions
             if all(context.has_permission(p) for p in tool.required_permissions):
                 allowed_tools.append({
-                    "name": tool.name,
-                    "description": tool.description,
-                    "parameters": tool.input_schema
+                    "type": "function",
+                    "function": {
+                        "name": tool.name,
+                        "description": tool.description,
+                        "parameters": tool.input_schema
+                    }
                 })
         return allowed_tools
 
