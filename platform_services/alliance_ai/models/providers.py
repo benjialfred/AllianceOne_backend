@@ -147,7 +147,7 @@ class GroqProvider(LLMProvider):
     Groq provides ultra-fast inference for Llama 3 models and supports native tool calling
     using the standard OpenAI API format.
     """
-    def __init__(self, model_name: str = "llama-3.1-8b-instant"):
+    def __init__(self, model_name: str = "openai/gpt-oss-20b"):
         import os
         self.model_name = model_name
         self.base_url = "https://api.groq.com/openai/v1"

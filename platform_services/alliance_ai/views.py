@@ -13,10 +13,13 @@ class AskAllianceAIView(APIView):
             return Response({"error": "Prompt is required"}, status=400)
 
         user = request.user
-        if not user.is_authenticated:
+        if not user or not user.is_authenticated:
             # Fallback for local development testing
             User = get_user_model()
             user = User.objects.filter(is_superuser=True).first() or User.objects.first()
+            
+            if not user:
+                return Response({"error": "No user found in database. Please run python manage.py createsuperuser or login."}, status=401)
 
         # Delegate to the Gateway which handles isolation, RBAC and execution
         result = AllianceAIGateway.ask(

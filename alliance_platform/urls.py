@@ -19,6 +19,7 @@ from django.urls import path, include
 from django.http import JsonResponse
 from django.conf import settings
 from django.conf.urls.static import static
+from platform_services.identity.auth_views import SimpleLoginView
 
 def api_root(request):
     return JsonResponse({
@@ -30,6 +31,7 @@ def api_root(request):
 urlpatterns = [
     path('', api_root, name='api-root'),
     path('admin/', admin.site.urls),
+    path('api/core/auth/login/', SimpleLoginView.as_view(), name='auth-login'),
     path('api/core/identity/', include('platform_services.identity.urls')),
     path('api/core/dashboards/', include('platform_services.dashboards.api.urls')),
     path('api/core/ai/', include('platform_services.alliance_ai.urls')),
