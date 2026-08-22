@@ -141,3 +141,119 @@ class OllamaProvider(LLMProvider):
         
         return "Agentic loop exceeded max iterations without a final answer."
 
+class GroqProvider(LLMProvider):
+    """
+    Provider for Groq Cloud API.
+    Groq provides ultra-fast inference for Llama 3 models and supports native tool calling
+    using the standard OpenAI API format.
+    """
+    def __init__(self, model_name: str = "llama-3.1-8b-instant"):
+        import os
+        self.model_name = model_name
+        self.base_url = "https://api.groq.com/openai/v1"
+        self.api_key = os.environ.get("GROQ_API_KEY", "")
+
+    @property
+    def provider_name(self) -> str:
+        return "groq"
+
+    @property
+    def supports_tools(self) -> bool:
+        return True
+
+    def generate(self, messages: List[Dict[str, str]], tools: List[Dict[str, Any]] = None) -> str:
+        import requests
+        
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json"
+        }
+        
+        payload = {
+            "model": self.model_name,
+            "messages": messages,
+            "stream": False
+        }
+        
+        if tools:
+            payload["tools"] = tools
+
+        try:
+            response = requests.post(f"{self.base_url}/chat/completions", json=payload, headers=headers)
+            response.raise_for_status()
+            data = response.json()
+            return data["choices"][0]["message"]["content"]
+        except Exception as e:
+            return f"Error communicating with Groq API: {str(e)}"
+
+    def execute_tool_call_loop(self, messages: List[Dict[str, str]], tools: List[Dict[str, Any]], tool_registry, context=None) -> str:
+        import requests
+        import json
+        
+        if not self.api_key:
+            return "Erreur : La clé GROQ_API_KEY n'est pas configurée dans l'environnement backend."
+            
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json"
+        }
+        
+        current_messages = messages.copy()
+        max_iterations = 5
+        
+        for _ in range(max_iterations):
+            payload = {
+                "model": self.model_name,
+                "messages": current_messages,
+                "stream": False
+            }
+            if tools:
+                payload["tools"] = tools
+                # Groq specific requirement sometimes for tools
+                payload["tool_choice"] = "auto"
+
+            try:
+                response = requests.post(f"{self.base_url}/chat/completions", json=payload, headers=headers)
+                response.raise_for_status()
+                data = response.json()
+            except Exception as e:
+                return f"Error communicating with Groq API: {str(e)}"
+
+            message = data["choices"][0].get("message", {})
+            tool_calls = message.get("tool_calls")
+
+            if not tool_calls:
+                # No more tools to call, return the final response
+                return message.get("content", "")
+
+            # Add the assistant's message with tool calls to the history
+            current_messages.append(message)
+
+            # Execute all requested tools
+            for tool_call in tool_calls:
+                function_name = tool_call["function"]["name"]
+                # Groq returns arguments as a stringified JSON
+                arguments_str = tool_call["function"]["arguments"]
+                try:
+                    arguments = json.loads(arguments_str) if isinstance(arguments_str, str) else arguments_str
+                except json.JSONDecodeError:
+                    arguments = {}
+                
+                try:
+                    if context:
+                        tool_result = tool_registry.execute_tool(function_name, arguments, context)
+                    else:
+                        tool_result = f"Error: No context provided for tool {function_name}"
+                except Exception as e:
+                    tool_result = f"Error executing tool: {str(e)}"
+
+                # Add the tool response to messages
+                current_messages.append({
+                    "role": "tool",
+                    "tool_call_id": tool_call.get("id", "call_1"),
+                    "name": function_name,
+                    "content": json.dumps(tool_result)
+                })
+        
+        return "Agentic loop exceeded max iterations without a final answer."
+
