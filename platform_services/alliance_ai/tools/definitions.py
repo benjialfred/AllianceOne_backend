@@ -1,23 +1,37 @@
 from enum import Enum
-from dataclasses import dataclass
-from typing import Callable, List, Dict, Any
+from dataclasses import dataclass, field
+from typing import Callable, List, Dict, Any, Union
 
 class RiskLevel(Enum):
-    LOW = "LOW"           # Read-only operations, safe
-    MEDIUM = "MEDIUM"     # Creates drafts, non-destructive
-    HIGH = "HIGH"         # Modifies data, sends emails
-    CRITICAL = "CRITICAL" # Deletions, financial transactions, massive updates
+    LOW = "LOW"
+    MEDIUM = "MEDIUM"
+    HIGH = "HIGH"
+    CRITICAL = "CRITICAL"
+
+class ActionScope(Enum):
+    READ = "READ"
+    CREATE = "CREATE"
+    UPDATE = "UPDATE"
+    DELETE = "DELETE"
+    FINANCIAL = "FINANCIAL"
+    EXTERNAL_SIDE_EFFECT = "EXTERNAL_SIDE_EFFECT"
 
 @dataclass
-class AIToolDefinition:
+class AIToolPolicy:
     """
-    Defines the contract for a capability exposed by a Bounded Context to Alliance AI.
+    Defines the contract and security policy for a capability exposed by a Bounded Context to Alliance AI.
     """
-    name: str                       # e.g., "education.search_students"
-    description: str                # e.g., "Search for students by name or class"
-    input_schema: Dict[str, Any]    # JSON Schema for inputs
-    output_schema: Dict[str, Any]   # JSON Schema for outputs (optional)
-    required_permissions: List[str] # e.g., ["education.student.read"]
-    risk_level: RiskLevel           # Determines if approval is needed
-    handler: Callable               # The actual python function to call
-    requires_confirmation: bool = False # Overrides risk level if explicitly set to True
+    name: str                       
+    description: str                
+    input_schema: Dict[str, Any]    
+    output_schema: Dict[str, Any]   
+    required_permissions: Union[str, List[str], Any] # Can be ANY or ALL composite
+    risk_level: RiskLevel           
+    action_scope: ActionScope = ActionScope.READ
+    mutation: bool = False
+    requires_confirmation: bool = False 
+    object_scope: str = "organization"
+    handler: Callable = None
+
+# For backwards compatibility during transition
+AIToolDefinition = AIToolPolicy

@@ -1,14 +1,12 @@
 from typing import Dict, Any, List
 from django.contrib.auth import get_user_model
 from platform_services.alliance_ai.context.context_engine import ContextEngine
-from platform_services.alliance_ai.models.model_router import ModelRouter
-from platform_services.alliance_ai.agents.orchestrator import AgentOrchestrator
+from platform_services.alliance_ai.orchestration.orchestrator import AllianceAIOrchestrator
 
 User = get_user_model()
 
 # Global Instances for the OS
-_model_router = ModelRouter()
-_orchestrator = AgentOrchestrator(_model_router)
+_orchestrator = AllianceAIOrchestrator()
 
 class AllianceAIGateway:
     """
@@ -23,12 +21,26 @@ class AllianceAIGateway:
         # 1. Resolve highly secure context
         ai_context = ContextEngine.build_context(user, client_context)
         
-        # 2. Hand off to Orchestrator
+        # 2. Hand off to Orchestrator (Returns ExecutionPlan)
         try:
-            result = _orchestrator.handle_request(prompt, ai_context, history)
-            return result
+            plan = _orchestrator.handle_request(prompt, ai_context)
+            return {
+                "status": "SUCCESS",
+                "plan_id": plan.plan_id,
+                "content": getattr(plan, "user_request_response", "Je traite votre demande..."),
+                "data": {
+                    "type": "mission_plan",
+                    "mission": {
+                        "title": "Mission en cours",
+                        "status": plan.status.value,
+                        "steps": []
+                    }
+                }
+            }
         except Exception as e:
             # Audit the error
+            import traceback
+            traceback.print_exc()
             return {
                 "status": "ERROR",
                 "content": "Je suis désolé, une erreur interne m'empêche de traiter votre demande.",

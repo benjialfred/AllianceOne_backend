@@ -1,5 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Dict, Any, List
+from platform_services.alliance_ai.security.approval_engine import SecurityApprovalEngine
+from platform_services.alliance_ai.security.types import Decision
 
 class LLMProvider(ABC):
     """
@@ -127,11 +129,33 @@ class OllamaProvider(LLMProvider):
                 
                 try:
                     if context:
-                        tool_result = tool_registry.execute_tool(function_name, arguments, context)
+                        # P0 Security Gate
+                        approval = SecurityApprovalEngine.evaluate(function_name, arguments, context)
+                        
+                        if approval.decision == Decision.ALLOW:
+                            tool_result = tool_registry.execute_tool(function_name, arguments, context)
+                        elif approval.decision == Decision.REQUIRE_CONFIRMATION:
+                            # Return immediately to the frontend, bypassing LLM
+                            return json.dumps({
+                                "type": "confirmation_required",
+                                "content": "Action requiert une confirmation.",
+                                "mission": {
+                                    "status": "WAITING_FOR_CONFIRMATION",
+                                    "pending_action": {
+                                        "tool": function_name,
+                                        "arguments": arguments,
+                                        "action_hash": approval.action_hash,
+                                        "risk_level": approval.risk_level
+                                    }
+                                }
+                            })
+                        else:
+                            # DENY - Fail Closed, feed back to LLM so it knows it was denied
+                            tool_result = {"error": "SECURITY_DENY", "reason": approval.reason_code}
                     else:
-                        tool_result = f"Error: No context provided for tool {function_name}"
+                        tool_result = {"error": "No context provided for tool"}
                 except Exception as e:
-                    tool_result = f"Error executing tool: {str(e)}"
+                    tool_result = {"error": f"Tool execution failed: {str(e)}"}
 
                 # Add the tool response to messages
                 current_messages.append({
@@ -148,10 +172,10 @@ class GroqProvider(LLMProvider):
     using the standard OpenAI API format.
     """
     def __init__(self, model_name: str = "openai/gpt-oss-20b"):
-        import os
+        from django.conf import settings
         self.model_name = model_name
         self.base_url = "https://api.groq.com/openai/v1"
-        self.api_key = os.environ.get("GROQ_API_KEY", "")
+        self.api_key = getattr(settings, 'GROQ_API_KEY', '')
 
     @property
     def provider_name(self) -> str:
@@ -205,7 +229,8 @@ class GroqProvider(LLMProvider):
             payload = {
                 "model": self.model_name,
                 "messages": current_messages,
-                "stream": False
+                "stream": False,
+                "response_format": {"type": "json_object"}
             }
             if tools:
                 payload["tools"] = tools
@@ -216,6 +241,9 @@ class GroqProvider(LLMProvider):
                 response = requests.post(f"{self.base_url}/chat/completions", json=payload, headers=headers)
                 response.raise_for_status()
                 data = response.json()
+            except requests.exceptions.HTTPError as e:
+                error_detail = e.response.text if hasattr(e, 'response') and e.response else str(e)
+                return f"Error communicating with Groq API: {str(e)} - {error_detail}"
             except Exception as e:
                 return f"Error communicating with Groq API: {str(e)}"
 
@@ -241,11 +269,33 @@ class GroqProvider(LLMProvider):
                 
                 try:
                     if context:
-                        tool_result = tool_registry.execute_tool(function_name, arguments, context)
+                        # P0 Security Gate
+                        approval = SecurityApprovalEngine.evaluate(function_name, arguments, context)
+                        
+                        if approval.decision == Decision.ALLOW:
+                            tool_result = tool_registry.execute_tool(function_name, arguments, context)
+                        elif approval.decision == Decision.REQUIRE_CONFIRMATION:
+                            # Return immediately to the frontend, bypassing LLM
+                            return json.dumps({
+                                "type": "confirmation_required",
+                                "content": "Cette action sensible requiert votre validation.",
+                                "mission": {
+                                    "status": "WAITING_FOR_CONFIRMATION",
+                                    "pending_action": {
+                                        "tool": function_name,
+                                        "arguments": arguments,
+                                        "action_hash": approval.action_hash,
+                                        "risk_level": approval.risk_level
+                                    }
+                                }
+                            })
+                        else:
+                            # DENY - Fail Closed
+                            tool_result = {"error": "SECURITY_DENY", "reason": approval.reason_code}
                     else:
-                        tool_result = f"Error: No context provided for tool {function_name}"
+                        tool_result = {"error": "No context provided for tool"}
                 except Exception as e:
-                    tool_result = f"Error executing tool: {str(e)}"
+                    tool_result = {"error": f"Tool execution failed: {str(e)}"}
 
                 # Add the tool response to messages
                 current_messages.append({

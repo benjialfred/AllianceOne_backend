@@ -40,6 +40,7 @@ urlpatterns = [
     path('api/library/', include('platform_services.library.urls')),
     path('api/finance/', include('platform_services.finance.urls')),
     path('api/tasks/', include('platform_services.tasks.urls')),
+    path('api/founder/', include('platform_services.founder.urls')),
 ]
 
 if settings.DEBUG:

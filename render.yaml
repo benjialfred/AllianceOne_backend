@@ -13,3 +13,29 @@ services:
         value: "False"
       - key: ALLOWED_HOSTS
         value: "*"
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: alliance-redis
+          property: connectionString
+      - key: GROQ_API_KEY
+        sync: false
+
+  - type: worker
+    name: alliance-worker
+    runtime: python
+    buildCommand: "./build.sh"
+    startCommand: "celery -A alliance_platform worker -l info"
+    envVars:
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: alliance-redis
+          property: connectionString
+      - key: GROQ_API_KEY
+        sync: false
+
+  - type: redis
+    name: alliance-redis
+    ipAllowList: []
+    plan: free

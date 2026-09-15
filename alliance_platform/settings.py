@@ -75,6 +75,8 @@ INSTALLED_APPS = [
     'platform_services.library',
     'platform_services.finance',
     'platform_services.tasks',
+    'platform_services.founder',
+    'platform_services.alliance_ai',
 ]
 
 MIDDLEWARE = [
@@ -188,3 +190,13 @@ REST_FRAMEWORK = {
         'rest_framework.permissions.AllowAny',
     ]
 }
+
+# Alliance AI LLM
+GROQ_API_KEY = env('GROQ_API_KEY', default='')
+
+# Celery Configuration
+CELERY_BROKER_URL = env('REDIS_URL', default='redis://localhost:6379/0')
+CELERY_RESULT_BACKEND = env('REDIS_URL', default='redis://localhost:6379/0')
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
