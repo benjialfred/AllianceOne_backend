@@ -1,23 +1,8 @@
-import base64
-import json
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from django.contrib.auth import authenticate
 from .models import User, Organization, OrganizationProfile, Membership
-
-
-def decode_google_jwt(token):
-    """Décode la charge utile (payload) d'un token JWT Google."""
-    try:
-        parts = token.split('.')
-        if len(parts) < 2:
-            return None
-        payload = parts[1]
-        padded = payload + '=' * (4 - len(payload) % 4)
-        decoded = base64.urlsafe_b64decode(padded)
-        return json.loads(decoded.decode('utf-8'))
-    except Exception:
-        return None
+from .jwt_utils import decode_google_jwt
 
 
 class SimpleLoginView(APIView):

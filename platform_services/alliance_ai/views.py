@@ -2,9 +2,11 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from platform_services.alliance_ai.gateway.gateway import AllianceAIGateway
+from platform_services.identity.authentication import AllianceTokenAuthentication
 from django.contrib.auth import get_user_model
 
 class AskAllianceAIView(APIView):
+    authentication_classes = [AllianceTokenAuthentication]
     permission_classes = [IsAuthenticated]
     def post(self, request):
         prompt = request.data.get('prompt')
@@ -33,6 +35,7 @@ class MissionAuditView(APIView):
     P1.8 Observability / Audit Trail
     Returns the complete execution trace for a given plan (mission).
     """
+    authentication_classes = [AllianceTokenAuthentication]
     permission_classes = [IsAuthenticated]
     def get(self, request, plan_id):
         from platform_services.alliance_ai.models.orchestration import ExecutionPlanModel

@@ -4,7 +4,7 @@ from platform_services.identity.models import Organization, Workspace, User, Per
 class OrganizationSerializer(serializers.ModelSerializer):
     class Meta:
         model = Organization
-        fields = ['id', 'name', 'legal_name', 'registration_number', 'created_at', 'updated_at']
+        fields = ['id', 'name', 'legal_name', 'registration_number', 'active_modules', 'created_at', 'updated_at']
 
 
 class WorkspaceSerializer(serializers.ModelSerializer):
