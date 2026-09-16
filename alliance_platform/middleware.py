@@ -21,7 +21,7 @@ class ErrorTrackingMiddleware(MiddlewareMixin):
     
     def process_exception(self, request, exception):
         # Ceci est appelé quand une vue lève une exception non gérée (500)
-        user = request.user.username if request.user.is_authenticated else 'Anonyme'
+        user = getattr(request.user, 'email', None) or getattr(request.user, 'username', None) or str(request.user) if getattr(request, 'user', None) and request.user.is_authenticated else 'Anonyme'
         path = request.path
         method = request.method
         
@@ -36,7 +36,7 @@ class ErrorTrackingMiddleware(MiddlewareMixin):
     def process_response(self, request, response):
         # Traquer les erreurs HTTP autres que 500 retournées par DRF ou Django
         if response.status_code in [400, 401, 403, 404, 500]:
-            user = request.user.username if hasattr(request, 'user') and request.user.is_authenticated else 'Anonyme'
+            user = getattr(request.user, 'email', None) or getattr(request.user, 'username', None) or str(request.user) if getattr(request, 'user', None) and request.user.is_authenticated else 'Anonyme'
             path = request.path
             method = request.method
             
