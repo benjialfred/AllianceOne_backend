@@ -51,6 +51,8 @@ class ExecutionPlan:
     status: ExecutionStatus = ExecutionStatus.PENDING
     steps: List[ExecutionStep] = field(default_factory=list)
     final_result: Optional[Any] = None
+    plan_type: str = "mission_plan"
+    user_request_response: str = ""
 
     def get_step(self, step_id: str) -> Optional[ExecutionStep]:
         for step in self.steps:

@@ -18,51 +18,76 @@ class IntentAnalyzer:
         return {"intent": "mission"}
 
 class Planner:
-    """Uses LLM to build the plan."""
+    """Uses LLM to build the plan or provide instant conversational answers."""
     def __init__(self):
         self.router = ModelRouter()
 
-    def create_plan(self, user_request: str, context: AllianceAIContext) -> ExecutionPlan:
+    def create_plan(self, user_request: str, context: AllianceAIContext, history: List[Dict[str, str]] = None) -> ExecutionPlan:
         # Get all allowed tools
         tools = ToolRegistry.get_all_tools_schema(context)
         tools_str = json.dumps(tools, indent=2, ensure_ascii=False)
         
-        system_prompt = f"""Tu es Alliance AI, l'assistant intelligent et Chef de Mission.
-Tu dois analyser la requête de l'utilisateur et générer un plan d'action (DAG).
-Tu peux utiliser les outils suivants :
+        system_prompt = f"""Tu es Alliance AI, l'assistant intelligent et chef d'orchestre d'Alliance One (ERP scolaire et de gestion d'entreprise).
+Tu disposes des outils système suivants pour interagir avec la plateforme :
 {tools_str}
 
-DIRECTIVE CRITIQUE :
-Réponds UNIQUEMENT avec un JSON strict contenant :
+DIRECTIVE CRITIQUE D'AIGUILLAGE :
+1. TYPE "chat" (Questions simples, salutations, explications, conseils d'utilisation) :
+- Si la demande de l'utilisateur est une salutation, une question générale, une demande d'information, un renseignement ou une assistance qui NE NÉCESSITE PAS d'exécuter d'outils système :
+- Réponds DIRECTEMENT, de manière complète, chaleureuse et structurée dans "content".
+- Ne génère AUCUN outil. Le tableau "steps" DOIT être vide [].
+- "type" DOIT être "chat".
+
+2. TYPE "mission_plan" (Tâches, actions système, modifications, créations de données) :
+- Si la demande exige d'effectuer une action concrète nécessitant un ou plusieurs outils système listés ci-dessus (ex: inscrire un élève, émettre une facture, enregistrer un paiement, créer une tâche, ajuster un stock) :
+- Donne un court message d'annonce dans "content" (ex: "J'enregistre le nouvel élève dans la classe demandée...").
+- Décris les étapes d'exécution dans le tableau "steps" avec "tool_name", "arguments", et "dependencies".
+- "type" DOIT être "mission_plan".
+
+FORMAT DE SORTIE STRICT (JSON UNIQUEMENT) :
 {{
-    "content": "Message de notification immédiat (ex: 'Je m'occupe des stocks, des tâches et du scolaire, voici le plan !')",
+    "type": "chat" ou "mission_plan",
+    "content": "Votre réponse directe ou votre annonce de mission",
     "steps": [
         {{
             "step_id": "step_1",
             "tool_name": "nom.de.l.outil",
             "arguments": {{"param": "value"}},
-            "dependencies": [] // Liste des step_id précédents
+            "dependencies": []
         }}
     ]
 }}
 """
-        messages = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_request}
-        ]
+        messages = [{"role": "system", "content": system_prompt}]
+        if history:
+            for h in history[-5:]:
+                if h.get("role") in ["user", "assistant"] and h.get("content"):
+                    messages.append({"role": h["role"], "content": h["content"]})
+        messages.append({"role": "user", "content": user_request})
         
         provider = self.router.get_provider("default")
-        # Ask LLM to generate the JSON plan
+        # Ask LLM to generate the JSON plan or answer
         response_text = provider.generate(messages=messages)
         
+        cleaned_text = response_text.strip()
+        if cleaned_text.startswith("```json"):
+            cleaned_text = cleaned_text[7:]
+        elif cleaned_text.startswith("```"):
+            cleaned_text = cleaned_text[3:]
+        if cleaned_text.endswith("```"):
+            cleaned_text = cleaned_text[:-3]
+        cleaned_text = cleaned_text.strip()
+
         try:
-            parsed = json.loads(response_text)
+            parsed = json.loads(cleaned_text)
         except Exception:
-            # Fallback
-            parsed = {"content": "Plan généré par défaut", "steps": []}
+            # Fallback to direct conversational response
+            parsed = {"type": "chat", "content": response_text, "steps": []}
             
         plan = ExecutionPlan(user_request=user_request, organization_id=context.organization_id)
-        plan.user_request_response = parsed.get("content", "Exécution en cours...")
+        plan_type = parsed.get("type", "chat" if not parsed.get("steps") else "mission_plan")
+        plan.plan_type = plan_type
+        plan.user_request_response = parsed.get("content", "Je traite votre demande...")
         
         for s in parsed.get("steps", []):
             original_step_id = s.get("step_id", str(uuid.uuid4()))
@@ -73,7 +98,6 @@ Réponds UNIQUEMENT avec un JSON strict contenant :
                 arguments=s.get("arguments", {}),
                 step_id=unique_step_id
             )
-            # We also need to map the dependencies to use the new prefixed ids
             step.dependencies = [f"{plan.plan_id}_{dep}" for dep in s.get("dependencies", [])]
             plan.add_step(step)
             
@@ -89,6 +113,7 @@ class AllianceAIOrchestrator:
     """
     Central orchestration engine for Alliance AI (P1).
     Replaces the naive LLM loop with a verifiable, traceable Execution Graph.
+    Fast-tracks simple questions to return immediate answers without delays.
     """
     def __init__(self):
         self.intent_analyzer = IntentAnalyzer()
@@ -97,47 +122,54 @@ class AllianceAIOrchestrator:
         self.executor = StepExecutor()
         self.verifier = VerificationEngine()
 
-    def handle_request(self, user_request: str, context: AllianceAIContext) -> ExecutionPlan:
+    def handle_request(self, user_request: str, context: AllianceAIContext, history: List[Dict[str, str]] = None) -> ExecutionPlan:
         """
-        Main entry point for handling a new user request.
+        Main entry point for handling a user request.
+        Fast-tracks simple questions immediately without running background workers.
         """
         logger.info(f"Starting workflow for request: {user_request}")
         
-        # 1. Analyze Intent
-        intent = self.intent_analyzer.analyze(user_request)
+        # 1. Planning
+        plan = self.planner.create_plan(user_request, context, history=history)
         
-        # 2. Planning
-        plan = self.planner.create_plan(user_request, context)
+        # 2. FAST-TRACK : Simple Q&A / Chat without tools
+        if len(plan.steps) == 0 or plan.plan_type == "chat":
+            plan.status = ExecutionStatus.SUCCEEDED
+            plan.plan_type = "chat"
+            StateStore.save_plan(plan)
+            return plan
+
+        # 3. MISSION / TOOLS : Actual background execution
         plan.status = ExecutionStatus.RUNNING
+        plan.plan_type = "mission_plan"
         StateStore.save_plan(plan)
         
-        # 3. Execution Loop (Async Celery Task)
-        from platform_services.alliance_ai.tasks import run_execution_loop_task
-        context_dict = {
-            "organization_id": context.organization_id,
-            "user_id": context.user_id,
-            "user_roles": context.user_roles,
-            "session_id": context.session_id,
-            "permissions": context.permissions,
-            "active_module": context.active_module,
-            "academic_year": context.academic_year
-        }
-        run_execution_loop_task.delay(plan.plan_id, context_dict)
-        
+        context_dict = context.to_dict()
+        try:
+            from platform_services.alliance_ai.tasks import run_execution_loop_task
+            run_execution_loop_task.delay(plan.plan_id, context_dict)
+        except Exception as e:
+            logger.warning(f"Celery task dispatch failed or offline ({e}), falling back to direct execution")
+            self._run_execution_loop(plan, context)
+            
         return plan
 
     def resume_plan(self, plan: ExecutionPlan, context: AllianceAIContext) -> ExecutionPlan:
         """
         Resumes a plan that was paused (e.g., WAITING_FOR_APPROVAL).
         """
-        plan = StateStore.load_plan(plan_id)
-        if not plan:
-            raise ValueError(f"Plan {plan_id} not found.")
+        if isinstance(plan, ExecutionPlan):
+            loaded_plan = plan
+        else:
+            loaded_plan = StateStore.load_plan(str(plan))
+            if not loaded_plan:
+                raise ValueError(f"Plan {plan} not found.")
 
-        logger.info(f"Resuming plan: {plan.plan_id}")
-        plan.status = ExecutionStatus.RUNNING
-        self._run_execution_loop(plan, context)
-        return plan
+        logger.info(f"Resuming plan: {loaded_plan.plan_id}")
+        loaded_plan.status = ExecutionStatus.RUNNING
+        StateStore.save_plan(loaded_plan)
+        self._run_execution_loop(loaded_plan, context)
+        return loaded_plan
 
     def _run_execution_loop(self, plan: ExecutionPlan, context: AllianceAIContext):
         """

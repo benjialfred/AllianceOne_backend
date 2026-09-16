@@ -1,9 +1,14 @@
-from rest_framework import viewsets
+from django.utils import timezone
+from rest_framework import viewsets, status
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
-from platform_services.identity.models import Organization, Workspace, User, Person, Role
+from platform_services.identity.models import Organization, Workspace, User, Person, Role, OrganizationProfile
 from platform_services.identity.mixins import TenantQuerySetMixin
-from .serializers import OrganizationSerializer, WorkspaceSerializer, UserSerializer, PersonSerializer, RoleSerializer
+from .serializers import (
+    OrganizationSerializer, WorkspaceSerializer, UserSerializer,
+    PersonSerializer, RoleSerializer, OnboardingSubmitSerializer,
+    OrganizationProfileSerializer,
+)
 
 @api_view(['GET'])
 def get_available_modules(request):
@@ -44,6 +49,116 @@ def get_available_modules(request):
         }
     ]
     return Response(modules)
+
+
+@api_view(['GET'])
+def onboarding_status(request):
+    """
+    Vérifie si l'organisation a complété l'onboarding.
+    GET /api/core/identity/onboarding/status/
+    """
+    tenant_id = request.headers.get('X-Tenant-ID')
+    org = None
+    if tenant_id:
+        org = Organization.objects.filter(id=tenant_id).first()
+    
+    if not org and request.user and request.user.is_authenticated:
+        membership = getattr(request.user, 'memberships', None)
+        if membership:
+            m = membership.select_related('organization').first()
+            if m:
+                org = m.organization
+
+    if not org:
+        org = Organization.objects.first()
+
+    if org:
+        profile = OrganizationProfile.objects.filter(organization=org).first()
+        if profile and profile.onboarding_completed:
+            return Response({
+                'onboarding_completed': True,
+                'organization_id': str(org.id),
+                'organization_name': org.name,
+                'profile': OrganizationProfileSerializer(profile).data,
+            })
+    return Response({'onboarding_completed': False})
+
+
+@api_view(['POST'])
+def onboarding_submit(request):
+    """
+    Soumet les données du wizard d'onboarding.
+    POST /api/core/identity/onboarding/
+    Crée ou met à jour l'OrganizationProfile et marque l'onboarding comme complété.
+    """
+    serializer = OnboardingSubmitSerializer(data=request.data)
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    data = serializer.validated_data
+    tenant_id = request.headers.get('X-Tenant-ID')
+    org = None
+    if tenant_id:
+        org = Organization.objects.filter(id=tenant_id).first()
+    
+    if not org and request.user and request.user.is_authenticated:
+        m = getattr(request.user, 'memberships', None)
+        if m:
+            first_m = m.first()
+            if first_m:
+                org = first_m.organization
+
+    if not org:
+        org = Organization.objects.first()
+
+    if not org:
+        org = Organization.objects.create(
+            name=data['organization_name'],
+            legal_name=data.get('legal_name', ''),
+            registration_number=data.get('registration_number', ''),
+        )
+    else:
+        org.name = data['organization_name']
+        if data.get('legal_name'):
+            org.legal_name = data['legal_name']
+        if data.get('registration_number'):
+            org.registration_number = data['registration_number']
+        org.active_modules = data['selected_modules']
+        org.save()
+
+    # Si l'utilisateur est connecté, s'assurer qu'il a une membership
+    if request.user and request.user.is_authenticated:
+        role, _ = Role.objects.get_or_create(
+            organization=org,
+            name="Administrateur",
+            defaults={"description": "Super Administrateur de l'organisation"}
+        )
+        Membership.objects.get_or_create(user=request.user, organization=org, defaults={"role": role})
+    
+    # Créer ou mettre à jour le profil avec onboarding_completed = True
+    profile, created = OrganizationProfile.objects.update_or_create(
+        organization=org,
+        defaults={
+            'sector': data.get('sector', ''),
+            'sub_sector': data.get('sub_sector', ''),
+            'country': data.get('country', 'CM'),
+            'city': data.get('city', ''),
+            'employee_count': data.get('employee_count', ''),
+            'phone': data.get('phone', ''),
+            'website': data.get('website', ''),
+            'selected_modules': data['selected_modules'],
+            'onboarding_completed': True,
+            'onboarding_completed_at': timezone.now(),
+        }
+    )
+    
+    return Response({
+        'status': 'ok',
+        'organization_id': str(org.id),
+        'organization_name': org.name,
+        'onboarding_completed': True,
+        'profile': OrganizationProfileSerializer(profile).data,
+    }, status=status.HTTP_200_OK)
 
 
 class OrganizationViewSet(viewsets.ModelViewSet):

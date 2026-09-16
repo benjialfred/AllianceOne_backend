@@ -36,6 +36,43 @@ class Organization(UniversalObject):
         return self.name
 
 
+def default_selected_modules():
+    return []
+
+
+class OrganizationProfile(models.Model):
+    """
+    Profil étendu de l'Organisation, collecté lors de l'onboarding.
+    Stocke le secteur, la taille, la localisation et les modules choisis.
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    organization = models.OneToOneField(
+        Organization, on_delete=models.CASCADE, related_name='profile'
+    )
+    # Secteur d'activité
+    sector = models.CharField(max_length=100, blank=True)
+    sub_sector = models.CharField(max_length=100, blank=True)
+    # Localisation
+    country = models.CharField(max_length=2, default='CM', help_text="ISO 3166-1 alpha-2")
+    city = models.CharField(max_length=100, blank=True)
+    # Taille
+    employee_count = models.CharField(max_length=50, blank=True, help_text="ex: 1-10, 11-50, 51-200")
+    # Contact
+    phone = models.CharField(max_length=30, blank=True)
+    website = models.URLField(blank=True)
+    logo_url = models.URLField(blank=True)
+    # Modules sélectionnés à l'onboarding
+    selected_modules = models.JSONField(default=default_selected_modules)
+    # Onboarding status
+    onboarding_completed = models.BooleanField(default=False)
+    onboarding_completed_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Profile: {self.organization.name}"
+
+
 class TenantModel(UniversalObject):
     """
     Modèle de base pour toutes les entités métier (Modules).

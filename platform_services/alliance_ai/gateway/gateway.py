@@ -23,17 +23,32 @@ class AllianceAIGateway:
         
         # 2. Hand off to Orchestrator (Returns ExecutionPlan)
         try:
-            plan = _orchestrator.handle_request(prompt, ai_context)
+            plan = _orchestrator.handle_request(prompt, ai_context, history=history)
+            
+            # Fast-track for simple questions / direct chat (no tools needed)
+            if getattr(plan, "plan_type", "mission_plan") == "chat" or len(plan.steps) == 0:
+                content = getattr(plan, "user_request_response", "Voici ma réponse.")
+                return {
+                    "status": "SUCCESS",
+                    "plan_id": plan.plan_id,
+                    "content": content,
+                    "data": {
+                        "type": "chat",
+                        "content": content
+                    }
+                }
+            
+            # Mission requiring tool execution
             return {
                 "status": "SUCCESS",
                 "plan_id": plan.plan_id,
-                "content": getattr(plan, "user_request_response", "Je traite votre demande..."),
+                "content": getattr(plan, "user_request_response", "Je prépare l'exécution des tâches..."),
                 "data": {
                     "type": "mission_plan",
                     "mission": {
-                        "title": "Mission en cours",
+                        "title": getattr(plan, "title", "Mission en cours"),
                         "status": plan.status.value,
-                        "steps": []
+                        "steps": [s.to_dict() for s in plan.steps]
                     }
                 }
             }
