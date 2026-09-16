@@ -43,6 +43,7 @@ urlpatterns = [
     path('api/finance/', include('platform_services.finance.urls')),
     path('api/tasks/', include('platform_services.tasks.urls')),
     path('api/founder/', include('platform_services.founder.urls')),
+    path('api/integrations/telegram/', include('platform_services.telegram.urls')),
 ]
 
 if settings.DEBUG:

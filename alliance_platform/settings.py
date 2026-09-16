@@ -77,6 +77,7 @@ INSTALLED_APPS = [
     'platform_services.tasks',
     'platform_services.founder',
     'platform_services.alliance_ai',
+    'platform_services.telegram',
 ]
 
 MIDDLEWARE = [
@@ -204,3 +205,9 @@ CELERY_RESULT_BACKEND = env('REDIS_URL', default='redis://localhost:6379/0')
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
+
+# Telegram Bot Integration
+TELEGRAM_BOT_TOKEN = env('TELEGRAM_BOT_TOKEN', default='')
+TELEGRAM_WEBHOOK_SECRET = env('TELEGRAM_WEBHOOK_SECRET', default='alliance-one-telegram-secret-token-2026')
+TELEGRAM_COMMUNITY_URL = env('TELEGRAM_COMMUNITY_URL', default='https://t.me/AllianceOneCommunity')
+TELEGRAM_CHANNEL_URL = env('TELEGRAM_CHANNEL_URL', default='https://t.me/AllianceOneOfficial')
