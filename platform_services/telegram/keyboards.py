@@ -5,8 +5,8 @@ def get_main_menu_keyboard() -> Dict[str, Any]:
     """
     Returns the primary interactive inline keyboard for Alliance One.
     """
-    community_url = getattr(settings, 'TELEGRAM_COMMUNITY_URL', 'https://t.me/AllianceOneCommunity')
-    channel_url = getattr(settings, 'TELEGRAM_CHANNEL_URL', 'https://t.me/AllianceOneOfficial')
+    community_url = getattr(settings, 'TELEGRAM_COMMUNITY_URL', 'https://t.me/allianceonecommunity')
+    channel_url = getattr(settings, 'TELEGRAM_CHANNEL_URL', 'https://t.me/allianceonechannels')
 
     keyboard: List[List[Dict[str, str]]] = [
         [
@@ -26,7 +26,7 @@ def get_help_keyboard() -> Dict[str, Any]:
     """
     Returns the inline keyboard for the /help section.
     """
-    community_url = getattr(settings, 'TELEGRAM_COMMUNITY_URL', 'https://t.me/AllianceOneCommunity')
+    community_url = getattr(settings, 'TELEGRAM_COMMUNITY_URL', 'https://t.me/allianceonecommunity')
 
     keyboard: List[List[Dict[str, str]]] = [
         [
@@ -42,8 +42,8 @@ def get_community_keyboard() -> Dict[str, Any]:
     """
     Returns the inline keyboard for the /community section.
     """
-    community_url = getattr(settings, 'TELEGRAM_COMMUNITY_URL', 'https://t.me/AllianceOneCommunity')
-    channel_url = getattr(settings, 'TELEGRAM_CHANNEL_URL', 'https://t.me/AllianceOneOfficial')
+    community_url = getattr(settings, 'TELEGRAM_COMMUNITY_URL', 'https://t.me/allianceonecommunity')
+    channel_url = getattr(settings, 'TELEGRAM_CHANNEL_URL', 'https://t.me/allianceonechannels')
 
     keyboard: List[List[Dict[str, str]]] = [
         [

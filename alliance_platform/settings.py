@@ -211,5 +211,5 @@ CELERY_RESULT_SERIALIZER = 'json'
 # Telegram Bot Integration
 TELEGRAM_BOT_TOKEN = env('TELEGRAM_BOT_TOKEN', default='')
 TELEGRAM_WEBHOOK_SECRET = env('TELEGRAM_WEBHOOK_SECRET', default='alliance-one-telegram-secret-token-2026')
-TELEGRAM_COMMUNITY_URL = env('TELEGRAM_COMMUNITY_URL', default='https://t.me/AllianceOneCommunity')
-TELEGRAM_CHANNEL_URL = env('TELEGRAM_CHANNEL_URL', default='https://t.me/AllianceOneOfficial')
+TELEGRAM_COMMUNITY_URL = env('TELEGRAM_COMMUNITY_URL', default='https://t.me/allianceonecommunity')
+TELEGRAM_CHANNEL_URL = env('TELEGRAM_CHANNEL_URL', default='https://t.me/allianceonechannels')
