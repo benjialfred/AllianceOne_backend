@@ -129,3 +129,71 @@ def unlink_telegram_account(telegram_user_id: int) -> bool:
     identity.save(update_fields=['is_active', 'updated_at'])
     logger.info(f"Unlinked Telegram account {telegram_user_id} from user {identity.user.email}")
     return True
+
+def get_user_memberships(user):
+    """
+    Retrieves all valid Organization memberships for an Alliance One User.
+    """
+    return Membership.objects.filter(user=user).select_related('organization', 'role').order_by('organization__name')
+
+def get_active_membership(identity: TelegramIdentity) -> Optional[Membership]:
+    """
+    Ensures server-side multi-tenant integrity.
+    Verifies that the user still has an active, valid Membership in the recorded active_organization.
+    If revoked or missing, transparently heals by falling back to their first valid Membership.
+    """
+    if not identity or not identity.user:
+        return None
+
+    # 1. Check if current active_organization still has a valid membership
+    if identity.active_organization:
+        membership = Membership.objects.filter(
+            user=identity.user,
+            organization=identity.active_organization
+        ).select_related('organization', 'role').first()
+        if membership:
+            return membership
+
+    # 2. Fallback / Heal: assign first available membership
+    fallback_membership = get_user_memberships(identity.user).first()
+    if fallback_membership:
+        identity.active_organization = fallback_membership.organization
+        identity.save(update_fields=['active_organization', 'updated_at'])
+        logger.info(f"Auto-healed active organization for Telegram user {identity.telegram_user_id} to {fallback_membership.organization.name}")
+        return fallback_membership
+    else:
+        # User has no memberships left
+        if identity.active_organization is not None:
+            identity.active_organization = None
+            identity.save(update_fields=['active_organization', 'updated_at'])
+        return None
+
+def switch_active_organization(identity: TelegramIdentity, target_org_id: str) -> Tuple[bool, str, Optional[Membership]]:
+    """
+    Switches the active organization context for a verified Telegram user.
+    Enforces strict Fail-Closed security: the user MUST possess a valid Membership
+    in the requested organization. Any attempt to cross-tenant switch is rejected and logged.
+    """
+    if not identity or not identity.is_active:
+        return False, "Compte Telegram non authentifié ou inactif.", None
+
+    clean_org_id = str(target_org_id).strip()
+
+    membership = Membership.objects.filter(
+        user=identity.user,
+        organization_id=clean_org_id
+    ).select_related('organization', 'role').first()
+
+    if not membership:
+        logger.warning(
+            f"SECURITY ALERT: Telegram user {identity.telegram_user_id} ({identity.user.email}) "
+            f"attempted unauthorized switch to organization {clean_org_id} without membership."
+        )
+        return False, "Accès refusé : vous n'êtes pas membre de cette organisation.", None
+
+    identity.active_organization = membership.organization
+    identity.save(update_fields=['active_organization', 'updated_at'])
+    logger.info(f"Telegram user {identity.telegram_user_id} switched active organization to '{membership.organization.name}'")
+
+    return True, f"Organisation basculée sur {membership.organization.name} !", membership
+

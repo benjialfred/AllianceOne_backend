@@ -1,7 +1,12 @@
 import logging
 from typing import Dict, Any, Optional
 from .client import TelegramClient
-from .keyboards import get_main_menu_keyboard, get_help_keyboard, get_community_keyboard
+from .keyboards import (
+    get_main_menu_keyboard,
+    get_help_keyboard,
+    get_community_keyboard,
+    get_organization_switch_keyboard
+)
 
 logger = logging.getLogger(__name__)
 
@@ -78,7 +83,14 @@ Il vous permettra bientôt de :
 _L'intégration d'Alliance AI sera activée dans les phases suivantes après liaison sécurisée de votre compte._
 """
 
-from .identity import resolve_telegram_identity, link_telegram_account, unlink_telegram_account
+from .identity import (
+    resolve_telegram_identity,
+    link_telegram_account,
+    unlink_telegram_account,
+    get_user_memberships,
+    get_active_membership,
+    switch_active_organization
+)
 
 def handle_update(update: Dict[str, Any], client: Optional[TelegramClient] = None) -> Dict[str, Any]:
     """
@@ -235,19 +247,44 @@ def handle_message(message: Dict[str, Any], client: TelegramClient) -> Dict[str,
 
     # Command: /organization
     elif text.startswith("/organization"):
-        if is_linked and identity.active_organization:
+        if not is_linked:
+            response_text = "⚠️ Veuillez d'abord lier votre compte Alliance One avec `/connect`."
+            client.send_message(chat_id, response_text, reply_markup=get_main_menu_keyboard(is_linked=False))
+            return {"status": "handled", "command": "/organization", "is_linked": False}
+
+        active_membership = get_active_membership(identity)
+        memberships = list(get_user_memberships(identity.user))
+
+        if not memberships or not active_membership:
+            response_text = (
+                "⚠️ *Aucune organisation active*\n\n"
+                "Votre compte utilisateur Alliance One n'est actuellement rattaché à aucune organisation."
+            )
+            client.send_message(chat_id, response_text, reply_markup=get_main_menu_keyboard(is_linked=True))
+            return {"status": "handled", "command": "/organization", "count": 0}
+
+        modules_str = ", ".join(active_membership.organization.active_modules or ["Aucun"])
+        if len(memberships) == 1:
             response_text = (
                 f"🏢 *Organisation Active Alliance One*\n\n"
-                f"• *Nom* : *{identity.active_organization.name}*\n"
-                f"• *Modules actifs* : {', '.join(identity.active_organization.active_modules or [])}\n\n"
-                f"_La gestion multi-organisations complète sera activée en Phase 3._"
+                f"• *Organisation* : *{active_membership.organization.name}*\n"
+                f"• *Votre rôle* : {active_membership.role.name}\n"
+                f"• *Modules actifs* : {modules_str}\n"
+                f"• *Statut* : Organisation unique rattachée à votre profil."
             )
-        elif is_linked:
-            response_text = "ℹ️ Aucune organisation spécifique n'est actuellement assignée à votre profil."
+            client.send_message(chat_id, response_text, reply_markup=get_main_menu_keyboard(is_linked=True))
+            return {"status": "handled", "command": "/organization", "count": 1}
         else:
-            response_text = "⚠️ Veuillez d'abord lier votre compte Alliance One avec `/connect`."
-        client.send_message(chat_id, response_text, reply_markup=get_main_menu_keyboard(is_linked=is_linked))
-        return {"status": "handled", "command": "/organization"}
+            response_text = (
+                f"🏢 *Vos Organisations Alliance One* ({len(memberships)})\n\n"
+                f"• *Organisation active actuelle* : *{active_membership.organization.name}* (Actif ✅)\n"
+                f"• *Votre rôle* : {active_membership.role.name}\n"
+                f"• *Modules actifs* : {modules_str}\n\n"
+                f"_Sélectionnez une organisation ci-dessous pour basculer votre espace de travail :_"
+            )
+            keyboard = get_organization_switch_keyboard(memberships, active_membership.organization_id)
+            client.send_message(chat_id, response_text, reply_markup=keyboard)
+            return {"status": "handled", "command": "/organization", "count": len(memberships)}
 
     elif text.startswith("/help"):
         client.send_message(chat_id, HELP_MESSAGE, reply_markup=get_help_keyboard())
@@ -281,7 +318,7 @@ def handle_callback_query(callback_query: Dict[str, Any], client: TelegramClient
     from_user = callback_query.get("from", {})
     user_id = from_user.get("id") or chat_id
 
-    if query_id:
+    if query_id and not (data.startswith("btn_switch_org:") or data == "noop_current_org"):
         client.answer_callback_query(query_id)
 
     if not chat_id or not message_id:
@@ -356,24 +393,94 @@ def handle_callback_query(callback_query: Dict[str, Any], client: TelegramClient
         return {"status": "handled", "action": "me"}
 
     elif data == "btn_organization":
-        if is_linked and identity.active_organization:
+        if not is_linked:
+            text = "⚠️ Veuillez d'abord lier votre compte Alliance One avec `/connect`."
+            client.edit_message_text(
+                chat_id=chat_id,
+                message_id=message_id,
+                text=text,
+                reply_markup=get_main_menu_keyboard(is_linked=False)
+            )
+            return {"status": "handled", "action": "organization", "is_linked": False}
+
+        active_membership = get_active_membership(identity)
+        memberships = list(get_user_memberships(identity.user))
+
+        if not memberships or not active_membership:
+            text = (
+                "⚠️ *Aucune organisation active*\n\n"
+                "Votre compte utilisateur Alliance One n'est actuellement rattaché à aucune organisation."
+            )
+            client.edit_message_text(
+                chat_id=chat_id,
+                message_id=message_id,
+                text=text,
+                reply_markup=get_main_menu_keyboard(is_linked=True)
+            )
+            return {"status": "handled", "action": "organization", "count": 0}
+
+        modules_str = ", ".join(active_membership.organization.active_modules or ["Aucun"])
+        if len(memberships) == 1:
             text = (
                 f"🏢 *Organisation Active Alliance One*\n\n"
-                f"• *Nom* : *{identity.active_organization.name}*\n"
-                f"• *Modules actifs* : {', '.join(identity.active_organization.active_modules or [])}\n\n"
-                f"_La gestion multi-organisations complète sera activée en Phase 3._"
+                f"• *Organisation* : *{active_membership.organization.name}*\n"
+                f"• *Votre rôle* : {active_membership.role.name}\n"
+                f"• *Modules actifs* : {modules_str}\n"
+                f"• *Statut* : Organisation unique rattachée à votre profil."
             )
-        elif is_linked:
-            text = "ℹ️ Aucune organisation spécifique n'est actuellement assignée à votre profil."
+            client.edit_message_text(
+                chat_id=chat_id,
+                message_id=message_id,
+                text=text,
+                reply_markup=get_main_menu_keyboard(is_linked=True)
+            )
+            return {"status": "handled", "action": "organization", "count": 1}
         else:
-            text = "⚠️ Veuillez d'abord lier votre compte Alliance One avec `/connect`."
-        client.edit_message_text(
-            chat_id=chat_id,
-            message_id=message_id,
-            text=text,
-            reply_markup=get_main_menu_keyboard(is_linked=is_linked)
-        )
-        return {"status": "handled", "action": "organization"}
+            text = (
+                f"🏢 *Vos Organisations Alliance One* ({len(memberships)})\n\n"
+                f"• *Organisation active actuelle* : *{active_membership.organization.name}* (Actif ✅)\n"
+                f"• *Votre rôle* : {active_membership.role.name}\n"
+                f"• *Modules actifs* : {modules_str}\n\n"
+                f"_Sélectionnez une organisation ci-dessous pour basculer votre espace de travail :_"
+            )
+            keyboard = get_organization_switch_keyboard(memberships, active_membership.organization_id)
+            client.edit_message_text(
+                chat_id=chat_id,
+                message_id=message_id,
+                text=text,
+                reply_markup=keyboard
+            )
+            return {"status": "handled", "action": "organization", "count": len(memberships)}
+
+    elif data.startswith("btn_switch_org:"):
+        target_org_id = data.split("btn_switch_org:", 1)[1]
+        success, msg, new_membership = switch_active_organization(identity, target_org_id)
+        if success and new_membership:
+            client.answer_callback_query(query_id, text=f"Bascule vers {new_membership.organization.name} réussie !")
+            modules_str = ", ".join(new_membership.organization.active_modules or ["Aucun"])
+            text = (
+                f"✅ *Organisation active modifiée avec succès !*\n\n"
+                f"• *Nouvelle organisation* : *{new_membership.organization.name}*\n"
+                f"• *Votre rôle* : {new_membership.role.name}\n"
+                f"• *Modules actifs* : {modules_str}\n\n"
+                f"Toutes vos prochaines interactions et requêtes IA cibleront cet espace de travail."
+            )
+            memberships = list(get_user_memberships(identity.user))
+            keyboard = get_organization_switch_keyboard(memberships, new_membership.organization_id)
+            client.edit_message_text(
+                chat_id=chat_id,
+                message_id=message_id,
+                text=text,
+                reply_markup=keyboard
+            )
+            return {"status": "handled", "action": "switch_org", "success": True, "org_id": target_org_id}
+        else:
+            client.answer_callback_query(query_id, text="Accès refusé : organisation non autorisée !", show_alert=True)
+            return {"status": "handled", "action": "switch_org", "success": False, "error": msg}
+
+    elif data == "noop_current_org":
+        client.answer_callback_query(query_id, text="Cette organisation est déjà votre organisation active.")
+        return {"status": "handled", "action": "noop_current_org"}
 
     elif data == "btn_disconnect":
         if is_linked:

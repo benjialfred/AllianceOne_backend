@@ -72,3 +72,23 @@ def get_community_keyboard() -> Dict[str, Any]:
         ]
     ]
     return {"inline_keyboard": keyboard}
+
+def get_organization_switch_keyboard(user_memberships, current_active_org_id: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Constructs an interactive inline keyboard allowing multi-organization users
+    to seamlessly switch their active tenant context.
+    """
+    keyboard: List[List[Dict[str, str]]] = []
+
+    for m in user_memberships:
+        is_current = str(m.organization_id) == str(current_active_org_id)
+        status_label = " (Actif ✅)" if is_current else ""
+        btn_text = f"🏢 {m.organization.name}{status_label}"
+        callback_data = "noop_current_org" if is_current else f"btn_switch_org:{m.organization_id}"
+        keyboard.append([{"text": btn_text, "callback_data": callback_data}])
+
+    keyboard.append([
+        {"text": "🔙 Menu Principal", "callback_data": "btn_main_menu"}
+    ])
+    return {"inline_keyboard": keyboard}
+

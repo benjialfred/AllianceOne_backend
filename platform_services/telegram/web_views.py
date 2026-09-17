@@ -79,3 +79,37 @@ class TelegramUnlinkView(APIView):
             return Response({"status": "success", "message": "Compte Telegram dissocié avec succès."}, status=200)
         else:
             return Response({"status": "noop", "message": "Aucun compte Telegram actif n'était associé."}, status=200)
+
+
+class TelegramSwitchOrgView(APIView):
+    """
+    Allows an authenticated web user to switch their active Telegram organization context.
+    Enforces strict membership verification.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        user = request.user
+        org_id = request.data.get("organization_id")
+        if not org_id:
+            return Response({"error": "organization_id est requis"}, status=400)
+
+        identity = TelegramIdentity.objects.filter(user=user, is_active=True).first()
+        if not identity:
+            return Response({"error": "Aucun compte Telegram lié pour cet utilisateur"}, status=404)
+
+        from .identity import switch_active_organization
+        success, msg, membership = switch_active_organization(identity, org_id)
+        if not success or not membership:
+            return Response({"error": msg}, status=403)
+
+        return Response({
+            "status": "success",
+            "message": msg,
+            "active_organization": {
+                "id": str(membership.organization.id),
+                "name": membership.organization.name,
+                "role": membership.role.name
+            }
+        }, status=200)
+
