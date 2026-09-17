@@ -22,10 +22,13 @@ UNAUTHENTICATED_AI_MESSAGE = """⚠️ *Authentification requise pour Alliance A
 
 Pour dialoguer avec *Alliance AI*, consulter vos données ou exécuter des actions, vous devez d'abord associer votre compte *Alliance One*.
 
-*Comment faire ?*
-1. Connectez-vous sur votre espace web Alliance One.
-2. Allez dans vos paramètres et cliquez sur *« Connecter Telegram »*.
-3. Tapez `/connect <VOTRE_CODE>` ici ou utilisez le bouton ci-dessous.
+*Comment associer votre compte en 1 minute ?*
+1️⃣ Ouvrez votre plateforme web *Alliance One* :
+   Cliquez sur le bouton ci-dessous *« 🌐 Ouvrir Alliance One Web »*.
+2️⃣ Rendez-vous dans les **Paramètres** ou cliquez sur *« Bot Telegram »* dans la barre supérieure.
+3️⃣ Cliquez sur *« Ouvrir Telegram & Associer Mon Compte »* (liaison en 1 clic) ou copiez le code personnel à 6 caractères (ex: `ALX-123456`).
+4️⃣ Si vous avez copié le code, tapez simplement ici :
+   `/connect VOTRE_CODE`
 """
 
 def process_ai_query(
@@ -48,8 +51,22 @@ def process_ai_query(
         logger.info(f"Unauthenticated AI query attempt from telegram user {user_id}")
         keyboard = {
             "inline_keyboard": [
-                [{"text": "🔗 Lier mon compte", "callback_data": "btn_connect_info"}],
-                [{"text": "❓ Aide", "callback_data": "btn_help"}]
+                [
+                    {
+                        "text": "🌐 Ouvrir Alliance One Web",
+                        "url": "https://allianceone-frontend.vercel.app/app/settings"
+                    }
+                ],
+                [
+                    {
+                        "text": "ℹ️ Comment obtenir mon code ?",
+                        "callback_data": "btn_connect_info"
+                    },
+                    {
+                        "text": "❓ Aide",
+                        "callback_data": "btn_help"
+                    }
+                ]
             ]
         }
         client.send_message(chat_id, UNAUTHENTICATED_AI_MESSAGE, reply_markup=keyboard)

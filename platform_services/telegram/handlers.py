@@ -52,9 +52,11 @@ CONNECT_INFO_MESSAGE = """*Liaison de votre compte Alliance One* 🔗
 
 Pour associer votre compte Telegram à votre compte Alliance One :
 
-1. Connectez-vous à votre plateforme web *Alliance One*.
-2. Ouvrez vos paramètres ou cliquez sur *« Connecter Telegram »*.
-3. Cliquez sur le lien direct ou tapez la commande suivante ici :
+1️⃣ Connectez-vous à votre plateforme web *Alliance One* :
+   https://allianceone-frontend.vercel.app/app/settings
+2️⃣ Cliquez sur *« Bot Telegram »* dans la barre supérieure ou dans vos Paramètres.
+3️⃣ Cliquez sur *« Ouvrir Telegram & Associer Mon Compte »* pour une liaison automatique en 1 clic !
+   _Ou copiez votre code personnel à 6 caractères et tapez ici :_
    `/connect <VOTRE_CODE>`
 
 _Chaque code est à usage unique et expire après 10 minutes pour votre sécurité._
