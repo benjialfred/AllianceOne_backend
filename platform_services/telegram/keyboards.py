@@ -1,9 +1,10 @@
 from typing import Dict, Any, List
 from django.conf import settings
 
-def get_main_menu_keyboard() -> Dict[str, Any]:
+def get_main_menu_keyboard(is_linked: bool = False) -> Dict[str, Any]:
     """
     Returns the primary interactive inline keyboard for Alliance One.
+    Adapts options based on whether the user's Telegram identity is verified.
     """
     community_url = getattr(settings, 'TELEGRAM_COMMUNITY_URL', 'https://t.me/allianceonecommunity')
     channel_url = getattr(settings, 'TELEGRAM_CHANNEL_URL', 'https://t.me/allianceonechannels')
@@ -11,15 +12,29 @@ def get_main_menu_keyboard() -> Dict[str, Any]:
     keyboard: List[List[Dict[str, str]]] = [
         [
             {"text": "🤖 Alliance AI", "callback_data": "btn_ai_info"}
-        ],
-        [
-            {"text": "👥 Communauté", "url": community_url},
-            {"text": "📢 Canal Officiel", "url": channel_url}
-        ],
-        [
-            {"text": "❓ Aide & Commandes", "callback_data": "btn_help"}
         ]
     ]
+
+    if is_linked:
+        keyboard.append([
+            {"text": "👤 Mon Compte (/me)", "callback_data": "btn_me"},
+            {"text": "🏢 Organisation", "callback_data": "btn_organization"}
+        ])
+    else:
+        keyboard.append([
+            {"text": "🔗 Lier mon compte Alliance One", "callback_data": "btn_connect_info"}
+        ])
+
+    keyboard.append([
+        {"text": "👥 Communauté", "url": community_url},
+        {"text": "📢 Canal Officiel", "url": channel_url}
+    ])
+
+    bottom_row = [{"text": "❓ Aide & Commandes", "callback_data": "btn_help"}]
+    if is_linked:
+        bottom_row.append({"text": "🚪 Déconnexion", "callback_data": "btn_disconnect"})
+    keyboard.append(bottom_row)
+
     return {"inline_keyboard": keyboard}
 
 def get_help_keyboard() -> Dict[str, Any]:
