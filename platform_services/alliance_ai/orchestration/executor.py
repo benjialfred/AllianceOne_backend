@@ -45,12 +45,22 @@ class StepExecutor:
 
         # 2. P0 Security Gate
         try:
-            approval = SecurityApprovalEngine.evaluate(
-                tool_name=step.tool_name, 
-                arguments=resolved_arguments, 
-                context=context,
-                mission_id=plan.plan_id
-            )
+            provided_hash = step.execution_metadata.get("confirmation_hash")
+            if provided_hash:
+                approval = SecurityApprovalEngine.revalidate_confirmation(
+                    tool_name=step.tool_name,
+                    arguments=resolved_arguments,
+                    context=context,
+                    mission_id=plan.plan_id,
+                    provided_hash=provided_hash
+                )
+            else:
+                approval = SecurityApprovalEngine.evaluate(
+                    tool_name=step.tool_name, 
+                    arguments=resolved_arguments, 
+                    context=context,
+                    mission_id=plan.plan_id
+                )
             
             if approval.decision == Decision.REQUIRE_CONFIRMATION:
                 step.status = ExecutionStatus.WAITING_FOR_APPROVAL

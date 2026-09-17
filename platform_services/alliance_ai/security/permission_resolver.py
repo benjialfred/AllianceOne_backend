@@ -20,13 +20,21 @@ ROLE_PERMISSIONS_MAPPING = {
         "finance.invoice.read",
         "finance.invoice.create",
         "finance.refund",
+        "inventory.stock.read",
+        "inventory.stock.write",
+        "tasks.task.read",
+        "tasks.task.create",
         "system.admin"
     ],
     "MANAGER": [
         "education.student.read",
         "education.student.create",
         "finance.invoice.read",
-        "finance.invoice.create"
+        "finance.invoice.create",
+        "inventory.stock.read",
+        "inventory.stock.write",
+        "tasks.task.read",
+        "tasks.task.create"
     ],
     "SALES_AGENT": [
         "finance.invoice.read",

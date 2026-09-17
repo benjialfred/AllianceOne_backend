@@ -16,8 +16,7 @@ class ToolRegistry:
 
     @classmethod
     def register(cls, tool: AIToolDefinition) -> None:
-        if tool.name in cls._tools:
-            raise ValueError(f"Tool {tool.name} is already registered.")
+        # Idempotent registration: update tool definition cleanly
         cls._tools[tool.name] = tool
 
     @classmethod

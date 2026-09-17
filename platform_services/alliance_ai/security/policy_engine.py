@@ -26,6 +26,8 @@ class PolicyEngine:
             return True
             
         user_perms = PermissionResolver.resolve_permissions(user_id, organization_id)
+        if "system.admin" in user_perms:
+            return True
         
         if isinstance(required, str):
             return required in user_perms

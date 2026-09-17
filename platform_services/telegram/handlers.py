@@ -5,7 +5,14 @@ from .keyboards import (
     get_main_menu_keyboard,
     get_help_keyboard,
     get_community_keyboard,
-    get_organization_switch_keyboard
+    get_organization_switch_keyboard,
+    get_ai_quick_keyboard
+)
+from .ai_service import (
+    process_ai_query,
+    handle_ai_confirm_callback,
+    handle_ai_cancel_callback,
+    UNAUTHENTICATED_AI_MESSAGE
 )
 
 logger = logging.getLogger(__name__)
@@ -286,6 +293,11 @@ def handle_message(message: Dict[str, Any], client: TelegramClient) -> Dict[str,
             client.send_message(chat_id, response_text, reply_markup=keyboard)
             return {"status": "handled", "command": "/organization", "count": len(memberships)}
 
+    # Command: /ai <prompt>
+    elif text.startswith("/ai"):
+        prompt = text[3:].strip()
+        return process_ai_query(user_id=user_id, chat_id=chat_id, query_text=prompt, client=client)
+
     elif text.startswith("/help"):
         client.send_message(chat_id, HELP_MESSAGE, reply_markup=get_help_keyboard())
         return {"status": "handled", "command": "/help"}
@@ -298,7 +310,11 @@ def handle_message(message: Dict[str, Any], client: TelegramClient) -> Dict[str,
         client.send_message(chat_id, STATUS_MESSAGE, reply_markup=get_main_menu_keyboard(is_linked=is_linked))
         return {"status": "handled", "command": "/status"}
 
-    # Default fallback for free text in Phase 2
+    # Natural language queries: route directly to Alliance AI
+    if text and not text.startswith("/"):
+        return process_ai_query(user_id=user_id, chat_id=chat_id, query_text=text, client=client)
+
+    # Default fallback for unknown commands or empty input
     fallback_text = (
         "Bonjour ! Je suis le bot officiel *Alliance One*.\n\n"
         "Pour commencer ou consulter les options disponibles, utilisez le menu ci-dessous :"
@@ -318,7 +334,12 @@ def handle_callback_query(callback_query: Dict[str, Any], client: TelegramClient
     from_user = callback_query.get("from", {})
     user_id = from_user.get("id") or chat_id
 
-    if query_id and not (data.startswith("btn_switch_org:") or data == "noop_current_org"):
+    if query_id and not (
+        data.startswith("btn_switch_org:") or
+        data == "noop_current_org" or
+        data.startswith("ai_confirm:") or
+        data.startswith("ai_cancel:")
+    ):
         client.answer_callback_query(query_id)
 
     if not chat_id or not message_id:
@@ -347,14 +368,36 @@ def handle_callback_query(callback_query: Dict[str, Any], client: TelegramClient
         )
         return {"status": "handled", "action": "help"}
 
+    elif data.startswith("ai_confirm:"):
+        return handle_ai_confirm_callback(callback_query, client)
+
+    elif data.startswith("ai_cancel:"):
+        return handle_ai_cancel_callback(callback_query, client)
+
     elif data == "btn_ai_info":
-        client.edit_message_text(
-            chat_id=chat_id,
-            message_id=message_id,
-            text=AI_INFO_MESSAGE,
-            reply_markup=get_help_keyboard()
-        )
-        return {"status": "handled", "action": "ai_info"}
+        if is_linked:
+            text = (
+                "🤖 *Alliance AI est à votre écoute !*\n\n"
+                "Posez-moi simplement votre question ou donnez-moi une instruction directement dans ce chat.\n\n"
+                "• _« Quels sont les élèves inscrits ? »_\n"
+                "• _« Quel est l'état des factures en attente ? »_\n"
+                "• _« Crée une tâche de suivi pour l'équipe »_"
+            )
+            client.edit_message_text(
+                chat_id=chat_id,
+                message_id=message_id,
+                text=text,
+                reply_markup=get_ai_quick_keyboard()
+            )
+            return {"status": "handled", "action": "ai_info", "ready": True}
+        else:
+            client.edit_message_text(
+                chat_id=chat_id,
+                message_id=message_id,
+                text=UNAUTHENTICATED_AI_MESSAGE,
+                reply_markup=get_help_keyboard()
+            )
+            return {"status": "handled", "action": "ai_info", "ready": False}
 
     elif data == "btn_connect_info":
         client.edit_message_text(

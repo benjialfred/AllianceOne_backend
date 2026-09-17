@@ -22,5 +22,5 @@ class TelegramHealthView(APIView):
             "configured": is_configured,
             "bot_username": "AllianceOneAIBot" if is_configured else None,
             "total_updates_processed": processed_updates_count,
-            "phase": "Phase 3 - Multi-Tenant Organization Context"
+            "phase": "Phase 4 - Alliance AI Fast-Track & Secure Actions"
         }, status=200)

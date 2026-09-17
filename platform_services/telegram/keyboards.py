@@ -92,3 +92,40 @@ def get_organization_switch_keyboard(user_memberships, current_active_org_id: Op
     ])
     return {"inline_keyboard": keyboard}
 
+def get_ai_confirmation_keyboard(plan_id: str, step_id: str, action_hash: str) -> Dict[str, Any]:
+    """
+    Constructs an inline confirmation keyboard for sensitive AI tool executions.
+    Enforces canonical action hash binding.
+    """
+    return {
+        "inline_keyboard": [
+            [
+                {
+                    "text": "✅ Confirmer l'action",
+                    "callback_data": f"ai_confirm:{plan_id}:{step_id}:{action_hash}"
+                },
+                {
+                    "text": "❌ Annuler",
+                    "callback_data": f"ai_cancel:{plan_id}:{step_id}"
+                }
+            ],
+            [
+                {"text": "🔙 Menu Principal", "callback_data": "btn_main_menu"}
+            ]
+        ]
+    }
+
+def get_ai_quick_keyboard() -> Dict[str, Any]:
+    """
+    Quick response keyboard after conversational AI answers.
+    """
+    return {
+        "inline_keyboard": [
+            [
+                {"text": "🏢 Organisation", "callback_data": "btn_organization"},
+                {"text": "🔙 Menu Principal", "callback_data": "btn_main_menu"}
+            ]
+        ]
+    }
+
+

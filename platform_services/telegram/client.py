@@ -86,10 +86,14 @@ class TelegramClient:
             "parse_mode": parse_mode,
             "disable_web_page_preview": disable_web_page_preview
         }
-        if reply_markup:
-            payload["reply_markup"] = reply_markup
-
-        return self._post("sendMessage", payload)
+        try:
+            return self._post("sendMessage", payload)
+        except TelegramAPIError as e:
+            if "can't parse entities" in str(e).lower() and parse_mode:
+                logger.warning(f"Telegram markdown parse error, falling back to plain text for chat {chat_id}")
+                payload.pop("parse_mode", None)
+                return self._post("sendMessage", payload)
+            raise
 
     def edit_message_text(
         self,
@@ -101,7 +105,7 @@ class TelegramClient:
         disable_web_page_preview: bool = True
     ) -> Dict[str, Any]:
         """
-        Edits an existing message's text and markup.
+        Edits an existing message's text and markup with automatic markdown parse error fallback.
         """
         payload: Dict[str, Any] = {
             "chat_id": chat_id,
@@ -113,7 +117,14 @@ class TelegramClient:
         if reply_markup:
             payload["reply_markup"] = reply_markup
 
-        return self._post("editMessageText", payload)
+        try:
+            return self._post("editMessageText", payload)
+        except TelegramAPIError as e:
+            if "can't parse entities" in str(e).lower() and parse_mode:
+                logger.warning(f"Telegram markdown parse error on edit, falling back to plain text for chat {chat_id}")
+                payload.pop("parse_mode", None)
+                return self._post("editMessageText", payload)
+            raise
 
     def send_chat_action(self, chat_id: Union[int, str], action: str = "typing") -> Dict[str, Any]:
         """
