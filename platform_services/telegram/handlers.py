@@ -92,7 +92,6 @@ def handle_message(message: Dict[str, Any], client: TelegramClient) -> Dict[str,
 
     logger.info(f"Received Telegram message from chat {chat_id}: '{text}'")
 
-    # Command routing
     if text.startswith("/start"):
         client.send_message(chat_id, WELCOME_MESSAGE, reply_markup=get_main_menu_keyboard())
         return {"status": "handled", "command": "/start"}
@@ -111,8 +110,8 @@ def handle_message(message: Dict[str, Any], client: TelegramClient) -> Dict[str,
 
     # Default fallback for free text in Phase 1
     fallback_text = (
-        f"Bonjour ! Je suis le bot officiel *Alliance One*.\n\n"
-        f"Pour commencer ou consulter les options disponibles, utilisez le menu ci-dessous :"
+        "Bonjour ! Je suis le bot officiel *Alliance One*.\n\n"
+        "Pour commencer ou consulter les options disponibles, utilisez le menu ci-dessous :"
     )
     client.send_message(chat_id, fallback_text, reply_markup=get_main_menu_keyboard())
     return {"status": "handled", "command": "default_fallback"}

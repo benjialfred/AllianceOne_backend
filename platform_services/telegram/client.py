@@ -6,21 +6,29 @@ from .exceptions import TelegramAPIError, TelegramConfigurationError
 
 logger = logging.getLogger(__name__)
 
+_shared_session: Optional[requests.Session] = None
+
+def get_shared_session() -> requests.Session:
+    global _shared_session
+    if _shared_session is None:
+        _shared_session = requests.Session()
+    return _shared_session
+
 class TelegramClient:
     """
     Clean, lightweight HTTP client for the official Telegram Bot API.
-    Uses standard requests with strict timeout, sanitized logging, and error handling.
+    Uses standard requests with strict timeout, connection pooling, sanitized logging, and error handling.
     """
 
     BASE_URL = "https://api.telegram.org/bot"
 
-    def __init__(self, token: Optional[str] = None, timeout: int = 10):
+    def __init__(self, token: Optional[str] = None, timeout: int = 10, session: Optional[requests.Session] = None):
         if token is None:
             self.token = getattr(settings, 'TELEGRAM_BOT_TOKEN', '')
         else:
             self.token = token
         self.timeout = timeout
-        self.session = requests.Session()
+        self.session = session or get_shared_session()
 
     def _get_url(self, method: str) -> str:
         if not self.token:

@@ -120,6 +120,8 @@ WSGI_APPLICATION = 'alliance_platform.wsgi.application'
 DATABASES = {
     'default': env.db(default=f'sqlite:///{BASE_DIR / "db.sqlite3"}')
 }
+DATABASES['default']['CONN_MAX_AGE'] = 600
+
 
 # Caching
 CACHES = {
