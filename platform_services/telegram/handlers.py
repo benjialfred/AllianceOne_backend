@@ -4,6 +4,7 @@ from .client import TelegramClient
 from .keyboards import (
     get_main_menu_keyboard,
     get_help_keyboard,
+    get_connect_keyboard,
     get_community_keyboard,
     get_organization_switch_keyboard,
     get_ai_quick_keyboard
@@ -52,12 +53,12 @@ CONNECT_INFO_MESSAGE = """*Liaison de votre compte Alliance One* 🔗
 
 Pour associer votre compte Telegram à votre compte Alliance One :
 
-1️⃣ Connectez-vous à votre plateforme web *Alliance One* :
+1️⃣ Cliquez sur le bouton *« 🌐 Ouvrir Alliance One Web »* ci-dessous :
    https://allianceone-frontend.vercel.app/app/settings
-2️⃣ Cliquez sur *« Bot Telegram »* dans la barre supérieure ou dans vos Paramètres.
+2️⃣ Sur votre plateforme web, cliquez sur *« Bot Telegram »* dans la barre supérieure ou dans vos Paramètres.
 3️⃣ Cliquez sur *« Ouvrir Telegram & Associer Mon Compte »* pour une liaison automatique en 1 clic !
-   _Ou copiez votre code personnel à 6 caractères et tapez ici :_
-   `/connect <VOTRE_CODE>`
+   _Ou copiez votre code personnel à 6 caractères (ex: ALX-123456) et tapez ici :_
+   `/connect VOTRE_CODE`
 
 _Chaque code est à usage unique et expire après 10 minutes pour votre sécurité._
 """
@@ -214,7 +215,7 @@ def handle_message(message: Dict[str, Any], client: TelegramClient) -> Dict[str,
             )
         else:
             response_text = CONNECT_INFO_MESSAGE
-        client.send_message(chat_id, response_text, reply_markup=get_main_menu_keyboard(is_linked=is_linked))
+            client.send_message(chat_id, response_text, reply_markup=get_connect_keyboard())
         return {"status": "handled", "command": "/connect"}
 
     # Command: /me
@@ -231,13 +232,14 @@ def handle_message(message: Dict[str, Any], client: TelegramClient) -> Dict[str,
                 f"• *Liaison établie le* : {verified_str}\n"
                 f"• *Statut* : Authentifié ✅"
             )
+            client.send_message(chat_id, response_text, reply_markup=get_main_menu_keyboard(is_linked=is_linked))
         else:
             response_text = (
                 f"⚠️ *Compte non connecté*\n\n"
                 f"Votre compte Telegram n'est pas encore associé à Alliance One.\n\n"
-                f"Utilisez `/connect` ou cliquez sur le bouton ci-dessous pour associer votre compte."
+                f"Cliquez sur le bouton ci-dessous pour ouvrir la plateforme web et associer votre compte en 1 clic :"
             )
-        client.send_message(chat_id, response_text, reply_markup=get_main_menu_keyboard(is_linked=is_linked))
+            client.send_message(chat_id, response_text, reply_markup=get_connect_keyboard())
         return {"status": "handled", "command": "/me", "is_linked": is_linked}
 
     # Command: /disconnect
@@ -257,8 +259,11 @@ def handle_message(message: Dict[str, Any], client: TelegramClient) -> Dict[str,
     # Command: /organization
     elif text.startswith("/organization"):
         if not is_linked:
-            response_text = "⚠️ Veuillez d'abord lier votre compte Alliance One avec `/connect`."
-            client.send_message(chat_id, response_text, reply_markup=get_main_menu_keyboard(is_linked=False))
+            response_text = (
+                "⚠️ *Compte non connecté*\n\n"
+                "Veuillez d'abord associer votre compte Alliance One avec `/connect` ou le bouton ci-dessous pour accéder à vos organisations :"
+            )
+            client.send_message(chat_id, response_text, reply_markup=get_connect_keyboard())
             return {"status": "handled", "command": "/organization", "is_linked": False}
 
         active_membership = get_active_membership(identity)
@@ -397,7 +402,7 @@ def handle_callback_query(callback_query: Dict[str, Any], client: TelegramClient
                 chat_id=chat_id,
                 message_id=message_id,
                 text=UNAUTHENTICATED_AI_MESSAGE,
-                reply_markup=get_help_keyboard()
+                reply_markup=get_connect_keyboard()
             )
             return {"status": "handled", "action": "ai_info", "ready": False}
 
@@ -406,7 +411,7 @@ def handle_callback_query(callback_query: Dict[str, Any], client: TelegramClient
             chat_id=chat_id,
             message_id=message_id,
             text=CONNECT_INFO_MESSAGE,
-            reply_markup=get_help_keyboard()
+            reply_markup=get_connect_keyboard()
         )
         return {"status": "handled", "action": "connect_info"}
 
@@ -423,28 +428,37 @@ def handle_callback_query(callback_query: Dict[str, Any], client: TelegramClient
                 f"• *Liaison établie le* : {verified_str}\n"
                 f"• *Statut* : Authentifié ✅"
             )
-        else:
-            text = (
-                f"⚠️ *Compte non connecté*\n\n"
-                f"Votre compte Telegram n'est pas encore associé à Alliance One.\n"
-                f"Utilisez `/connect` pour associer votre compte."
-            )
-        client.edit_message_text(
-            chat_id=chat_id,
-            message_id=message_id,
-            text=text,
-            reply_markup=get_main_menu_keyboard(is_linked=is_linked)
-        )
-        return {"status": "handled", "action": "me"}
-
-    elif data == "btn_organization":
-        if not is_linked:
-            text = "⚠️ Veuillez d'abord lier votre compte Alliance One avec `/connect`."
             client.edit_message_text(
                 chat_id=chat_id,
                 message_id=message_id,
                 text=text,
-                reply_markup=get_main_menu_keyboard(is_linked=False)
+                reply_markup=get_main_menu_keyboard(is_linked=is_linked)
+            )
+        else:
+            text = (
+                f"⚠️ *Compte non connecté*\n\n"
+                f"Votre compte Telegram n'est pas encore associé à Alliance One.\n\n"
+                f"Cliquez sur le bouton ci-dessous pour ouvrir la plateforme web et associer votre compte en 1 clic :"
+            )
+            client.edit_message_text(
+                chat_id=chat_id,
+                message_id=message_id,
+                text=text,
+                reply_markup=get_connect_keyboard()
+            )
+        return {"status": "handled", "action": "me"}
+
+    elif data == "btn_organization":
+        if not is_linked:
+            text = (
+                "⚠️ *Compte non connecté*\n\n"
+                "Veuillez d'abord associer votre compte Alliance One avec le bouton ci-dessous pour accéder à vos organisations :"
+            )
+            client.edit_message_text(
+                chat_id=chat_id,
+                message_id=message_id,
+                text=text,
+                reply_markup=get_connect_keyboard()
             )
             return {"status": "handled", "action": "organization", "is_linked": False}
 

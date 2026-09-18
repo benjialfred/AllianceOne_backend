@@ -11,6 +11,7 @@ from .client import TelegramClient
 from .identity import resolve_telegram_identity, get_active_membership
 from .keyboards import (
     get_main_menu_keyboard,
+    get_connect_keyboard,
     get_ai_confirmation_keyboard,
     get_ai_quick_keyboard,
     get_help_keyboard
@@ -23,8 +24,8 @@ UNAUTHENTICATED_AI_MESSAGE = """⚠️ *Authentification requise pour Alliance A
 Pour dialoguer avec *Alliance AI*, consulter vos données ou exécuter des actions, vous devez d'abord associer votre compte *Alliance One*.
 
 *Comment associer votre compte en 1 minute ?*
-1️⃣ Ouvrez votre plateforme web *Alliance One* :
-   Cliquez sur le bouton ci-dessous *« 🌐 Ouvrir Alliance One Web »*.
+1️⃣ Cliquez sur le bouton *« 🌐 Ouvrir Alliance One Web »* ci-dessous :
+   https://allianceone-frontend.vercel.app/app/settings
 2️⃣ Rendez-vous dans les **Paramètres** ou cliquez sur *« Bot Telegram »* dans la barre supérieure.
 3️⃣ Cliquez sur *« Ouvrir Telegram & Associer Mon Compte »* (liaison en 1 clic) ou copiez le code personnel à 6 caractères (ex: `ALX-123456`).
 4️⃣ Si vous avez copié le code, tapez simplement ici :
@@ -49,27 +50,7 @@ def process_ai_query(
     identity = resolve_telegram_identity(user_id) if user_id else None
     if not identity:
         logger.info(f"Unauthenticated AI query attempt from telegram user {user_id}")
-        keyboard = {
-            "inline_keyboard": [
-                [
-                    {
-                        "text": "🌐 Ouvrir Alliance One Web",
-                        "url": "https://allianceone-frontend.vercel.app/app/settings"
-                    }
-                ],
-                [
-                    {
-                        "text": "ℹ️ Comment obtenir mon code ?",
-                        "callback_data": "btn_connect_info"
-                    },
-                    {
-                        "text": "❓ Aide",
-                        "callback_data": "btn_help"
-                    }
-                ]
-            ]
-        }
-        client.send_message(chat_id, UNAUTHENTICATED_AI_MESSAGE, reply_markup=keyboard)
+        client.send_message(chat_id, UNAUTHENTICATED_AI_MESSAGE, reply_markup=get_connect_keyboard())
         return {"status": "unauthenticated", "handled": True}
 
     # 2. Resolve Active Organization Context with Auto-Heal

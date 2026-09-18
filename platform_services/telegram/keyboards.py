@@ -21,8 +21,12 @@ def get_main_menu_keyboard(is_linked: bool = False) -> Dict[str, Any]:
             {"text": "🏢 Organisation", "callback_data": "btn_organization"}
         ])
     else:
+        app_settings_url = getattr(settings, 'ALLIANCE_WEB_SETTINGS_URL', 'https://allianceone-frontend.vercel.app/app/settings?telegram=connect')
         keyboard.append([
-            {"text": "🔗 Lier mon compte Alliance One", "callback_data": "btn_connect_info"}
+            {"text": "🌐 Ouvrir Alliance One (Lier mon compte)", "url": app_settings_url}
+        ])
+        keyboard.append([
+            {"text": "ℹ️ Instructions de liaison (/connect)", "callback_data": "btn_connect_info"}
         ])
 
     keyboard.append([
@@ -36,6 +40,27 @@ def get_main_menu_keyboard(is_linked: bool = False) -> Dict[str, Any]:
     keyboard.append(bottom_row)
 
     return {"inline_keyboard": keyboard}
+
+def get_connect_keyboard() -> Dict[str, Any]:
+    """
+    Returns the inline keyboard for connection and linking instructions,
+    featuring a direct 1-click web button opening the platform settings/linking modal.
+    """
+    app_settings_url = getattr(settings, 'ALLIANCE_WEB_SETTINGS_URL', 'https://allianceone-frontend.vercel.app/app/settings?telegram=connect')
+    return {
+        "inline_keyboard": [
+            [
+                {
+                    "text": "🌐 Ouvrir Alliance One Web (Générer mon code)",
+                    "url": app_settings_url
+                }
+            ],
+            [
+                {"text": "🔙 Menu Principal", "callback_data": "btn_main_menu"},
+                {"text": "❓ Aide", "callback_data": "btn_help"}
+            ]
+        ]
+    }
 
 def get_help_keyboard() -> Dict[str, Any]:
     """
