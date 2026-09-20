@@ -7,8 +7,10 @@ from .keyboards import (
     get_connect_keyboard,
     get_community_keyboard,
     get_organization_switch_keyboard,
-    get_ai_quick_keyboard
+    get_ai_quick_keyboard,
+    get_notification_preferences_keyboard
 )
+from .models import TelegramIdentity, TelegramNotificationPreference
 from .ai_service import (
     process_ai_query,
     handle_ai_confirm_callback,
@@ -37,17 +39,23 @@ HELP_MESSAGE = """*Centre d'Aide Alliance One* ❓
 • `/start` — Affiche le message de bienvenue et le menu interactif.
 • `/connect <code>` — Lie votre compte utilisateur Alliance One de manière sécurisée.
 • `/me` — Affiche vos informations de compte lié et votre organisation active.
+• `/organization` — Gérer et basculer votre organisation active.
+• `/alerts` ou `/notifications` — Gérer vos préférences de notifications Telegram.
+• `/ai <question>` — Poser des questions et exécuter des missions avec Alliance AI.
 • `/community` — Liens vers notre groupe et canal officiel.
 • `/status` — Vérifie l'état opérationnel de la passerelle.
 • `/disconnect` — Dissocie votre compte Telegram d'Alliance One.
 • `/help` — Affiche ce message d'aide.
 
-*Fonctionnalités avancées (Phases suivantes) :*
-• `/organization` — Gérer et basculer votre organisation active (Phase 3).
-• `/ai` — Poser des questions et exécuter des missions avec Alliance AI (Phase 4 & 5).
-
 Pour toute question technique, rejoignez notre groupe d'entraide !
 """
+
+NOTIFICATIONS_MESSAGE = """🔔 *Préférences d'Alertes Instantanées Telegram*
+
+Configurez vos abonnements aux flux d'événements et alertes automatisées de votre organisation.
+
+_Cliquez sur une catégorie pour l'activer ou la désactiver instantanément :_"""
+
 
 CONNECT_INFO_MESSAGE = """*Liaison de votre compte Alliance One* 🔗
 
@@ -300,6 +308,23 @@ def handle_message(message: Dict[str, Any], client: TelegramClient) -> Dict[str,
             client.send_message(chat_id, response_text, reply_markup=keyboard)
             return {"status": "handled", "command": "/organization", "count": len(memberships)}
 
+    # Command: /alerts or /notifications
+    elif text.startswith("/alerts") or text.startswith("/notifications"):
+        if not is_linked or not identity:
+            client.send_message(
+                chat_id,
+                "⚠️ *Compte non connecté*\n\nVeuillez d'abord associer votre compte Alliance One pour configurer vos alertes.",
+                reply_markup=get_connect_keyboard()
+            )
+            return {"status": "handled", "command": "/alerts", "is_linked": False}
+        prefs, _ = TelegramNotificationPreference.objects.get_or_create(identity=identity)
+        client.send_message(
+            chat_id,
+            NOTIFICATIONS_MESSAGE,
+            reply_markup=get_notification_preferences_keyboard(prefs)
+        )
+        return {"status": "handled", "command": "/alerts", "is_linked": True}
+
     # Command: /ai <prompt>
     elif text.startswith("/ai"):
         prompt = text[3:].strip()
@@ -345,7 +370,9 @@ def handle_callback_query(callback_query: Dict[str, Any], client: TelegramClient
         data.startswith("btn_switch_org:") or
         data == "noop_current_org" or
         data.startswith("ai_confirm:") or
-        data.startswith("ai_cancel:")
+        data.startswith("ai_cancel:") or
+        data.startswith("notif_pref:") or
+        data.startswith("notif_act:")
     ):
         client.answer_callback_query(query_id)
 
@@ -540,6 +567,69 @@ def handle_callback_query(callback_query: Dict[str, Any], client: TelegramClient
     elif data == "noop_current_org":
         client.answer_callback_query(query_id, text="Cette organisation est déjà votre organisation active.")
         return {"status": "handled", "action": "noop_current_org"}
+
+    elif data == "btn_notifications":
+        if not is_linked or not identity:
+            text = (
+                "⚠️ *Compte non connecté*\n\n"
+                "Veuillez d'abord associer votre compte Alliance One pour configurer vos alertes Telegram."
+            )
+            client.edit_message_text(
+                chat_id=chat_id,
+                message_id=message_id,
+                text=text,
+                reply_markup=get_connect_keyboard()
+            )
+            return {"status": "handled", "action": "notifications", "is_linked": False}
+
+        prefs, _ = TelegramNotificationPreference.objects.get_or_create(identity=identity)
+        client.edit_message_text(
+            chat_id=chat_id,
+            message_id=message_id,
+            text=NOTIFICATIONS_MESSAGE,
+            reply_markup=get_notification_preferences_keyboard(prefs)
+        )
+        return {"status": "handled", "action": "notifications", "is_linked": True}
+
+    elif data.startswith("notif_pref:"):
+        if not is_linked or not identity:
+            if query_id:
+                client.answer_callback_query(query_id, text="Veuillez d'abord lier votre compte.", show_alert=True)
+            return {"status": "ignored", "reason": "unauthenticated"}
+
+        cat = data.split("notif_pref:", 1)[1]
+        prefs, _ = TelegramNotificationPreference.objects.get_or_create(identity=identity)
+        if cat in ["security", "securite"]:
+            prefs.alert_security = not prefs.alert_security
+        elif cat in ["finance", "finances"]:
+            prefs.alert_finance = not prefs.alert_finance
+        elif cat in ["inventory", "inventaire", "stock"]:
+            prefs.alert_inventory = not prefs.alert_inventory
+        elif cat in ["education", "absences"]:
+            prefs.alert_education = not prefs.alert_education
+        elif cat in ["daily_digest", "digest"]:
+            prefs.daily_digest = not prefs.daily_digest
+
+        prefs.save()
+        if query_id:
+            client.answer_callback_query(query_id, text="Préférences mises à jour ✅")
+
+        client.edit_message_text(
+            chat_id=chat_id,
+            message_id=message_id,
+            text=NOTIFICATIONS_MESSAGE,
+            reply_markup=get_notification_preferences_keyboard(prefs)
+        )
+        return {"status": "handled", "action": "toggle_pref", "category": cat}
+
+    elif data.startswith("notif_act:"):
+        # Generic action button handler on delivered notifications
+        parts = data.split(":")
+        act_type = parts[1] if len(parts) > 1 else "generic"
+        act_id = parts[2] if len(parts) > 2 else ""
+        if query_id:
+            client.answer_callback_query(query_id, text=f"Action prise en compte ({act_type}) ✅")
+        return {"status": "handled", "action": "notif_act", "type": act_type, "id": act_id}
 
     elif data == "btn_disconnect":
         if is_linked:

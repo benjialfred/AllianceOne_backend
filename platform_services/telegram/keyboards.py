@@ -20,6 +20,9 @@ def get_main_menu_keyboard(is_linked: bool = False) -> Dict[str, Any]:
             {"text": "👤 Mon Compte (/me)", "callback_data": "btn_me"},
             {"text": "🏢 Organisation", "callback_data": "btn_organization"}
         ])
+        keyboard.append([
+            {"text": "🔔 Alertes & Notifications (/alerts)", "callback_data": "btn_notifications"}
+        ])
     else:
         app_settings_url = getattr(settings, 'ALLIANCE_WEB_SETTINGS_URL', 'https://allianceone-frontend.vercel.app/app/settings?telegram=connect')
         keyboard.append([
@@ -153,4 +156,23 @@ def get_ai_quick_keyboard() -> Dict[str, Any]:
         ]
     }
 
+def get_notification_preferences_keyboard(prefs) -> Dict[str, Any]:
+    """
+    Constructs an interactive inline keyboard allowing users to toggle their notification channels on/off.
+    """
+    sec_icon = "✅ Activé" if prefs.alert_security else "❌ Désactivé"
+    fin_icon = "✅ Activé" if prefs.alert_finance else "❌ Désactivé"
+    inv_icon = "✅ Activé" if prefs.alert_inventory else "❌ Désactivé"
+    edu_icon = "✅ Activé" if prefs.alert_education else "❌ Désactivé"
+    dig_icon = "✅ Activé" if prefs.daily_digest else "❌ Désactivé"
 
+    return {
+        "inline_keyboard": [
+            [{"text": f"🔒 Sécurité : {sec_icon}", "callback_data": "notif_pref:security"}],
+            [{"text": f"💳 Finances : {fin_icon}", "callback_data": "notif_pref:finance"}],
+            [{"text": f"📦 Inventaire & Stocks : {inv_icon}", "callback_data": "notif_pref:inventory"}],
+            [{"text": f"🎓 Vie Scolaire : {edu_icon}", "callback_data": "notif_pref:education"}],
+            [{"text": f"📊 Résumé Quotidien : {dig_icon}", "callback_data": "notif_pref:daily_digest"}],
+            [{"text": "🔙 Menu Principal", "callback_data": "btn_main_menu"}]
+        ]
+    }

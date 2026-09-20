@@ -1,7 +1,14 @@
 from django.urls import path
 from .webhook import TelegramWebhookView
 from .views import TelegramHealthView
-from .web_views import TelegramLinkCodeView, TelegramStatusView, TelegramUnlinkView, TelegramSwitchOrgView
+from .web_views import (
+    TelegramLinkCodeView, 
+    TelegramStatusView, 
+    TelegramUnlinkView, 
+    TelegramSwitchOrgView,
+    TelegramPreferencesView,
+    TelegramTestNotificationView
+)
 
 urlpatterns = [
     # Webhook for Telegram Bot API
@@ -15,5 +22,8 @@ urlpatterns = [
     path('status/', TelegramStatusView.as_view(), name='telegram-status'),
     path('unlink/', TelegramUnlinkView.as_view(), name='telegram-unlink'),
     path('switch-org/', TelegramSwitchOrgView.as_view(), name='telegram-switch-org'),
+    path('preferences/', TelegramPreferencesView.as_view(), name='telegram-preferences'),
+    path('test-notification/', TelegramTestNotificationView.as_view(), name='telegram-test-notification'),
 ]
+
 

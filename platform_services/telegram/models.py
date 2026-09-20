@@ -92,3 +92,101 @@ class TelegramLinkCode(models.Model):
     def __str__(self):
         status = "USED" if self.used_at else ("EXPIRED" if self.expires_at <= timezone.now() else "VALID")
         return f"LinkCode {self.code} ({status}) for {self.user.email}"
+
+
+class TelegramNotificationLog(models.Model):
+    """
+    Tracks outgoing Telegram notifications and broadcasts with delivery state,
+    idempotency enforcement, and audit trace.
+    """
+    RECIPIENT_USER = 'USER'
+    RECIPIENT_ORG = 'ORG'
+    RECIPIENT_CHANNEL = 'CHANNEL'
+    RECIPIENT_COMMUNITY = 'COMMUNITY'
+    RECIPIENT_CHOICES = [
+        (RECIPIENT_USER, 'Utilisateur'),
+        (RECIPIENT_ORG, 'Organisation'),
+        (RECIPIENT_CHANNEL, 'Canal Officiel'),
+        (RECIPIENT_COMMUNITY, 'Groupe Communautaire'),
+    ]
+
+    LEVEL_INFO = 'INFO'
+    LEVEL_SUCCESS = 'SUCCESS'
+    LEVEL_WARNING = 'WARNING'
+    LEVEL_ALERT = 'ALERT'
+    LEVEL_CHOICES = [
+        (LEVEL_INFO, 'Information'),
+        (LEVEL_SUCCESS, 'Succès'),
+        (LEVEL_WARNING, 'Avertissement'),
+        (LEVEL_ALERT, 'Alerte Critique'),
+    ]
+
+    STATUS_PENDING = 'PENDING'
+    STATUS_DELIVERED = 'DELIVERED'
+    STATUS_FAILED = 'FAILED'
+    STATUS_CHOICES = [
+        (STATUS_PENDING, 'En attente'),
+        (STATUS_DELIVERED, 'Délivré'),
+        (STATUS_FAILED, 'Échoué'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    recipient_type = models.CharField(max_length=20, choices=RECIPIENT_CHOICES, default=RECIPIENT_USER)
+    recipient_id = models.CharField(max_length=255, db_index=True)
+    idempotency_key = models.CharField(max_length=255, unique=True, null=True, blank=True, db_index=True)
+    title = models.CharField(max_length=255)
+    message = models.TextField()
+    category = models.CharField(max_length=50, default='general', db_index=True)
+    level = models.CharField(max_length=20, choices=LEVEL_CHOICES, default=LEVEL_INFO)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING)
+    telegram_message_id = models.BigIntegerField(null=True, blank=True)
+    error_message = models.TextField(blank=True, default='')
+    sent_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Telegram Notification Log"
+        verbose_name_plural = "Telegram Notification Logs"
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"[{self.level}] {self.title} -> {self.recipient_type}:{self.recipient_id} ({self.status})"
+
+
+class TelegramNotificationPreference(models.Model):
+    """
+    Configurable alert subscription preferences per user identity.
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    identity = models.OneToOneField(
+        TelegramIdentity,
+        on_delete=models.CASCADE,
+        related_name='preferences'
+    )
+    alert_security = models.BooleanField(default=True, help_text="Alertes de sécurité et connexions")
+    alert_finance = models.BooleanField(default=True, help_text="Factures, paiements et relances")
+    alert_inventory = models.BooleanField(default=True, help_text="Ruptures de stock et alertes articles")
+    alert_education = models.BooleanField(default=True, help_text="Absences critiques et examens")
+    daily_digest = models.BooleanField(default=False, help_text="Résumé quotidien d'activité")
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Telegram Notification Preference"
+        verbose_name_plural = "Telegram Notification Preferences"
+
+    def __str__(self):
+        return f"Preferences for {self.identity}"
+
+    def is_category_enabled(self, category: str) -> bool:
+        cat = category.lower().strip()
+        if cat in ['security', 'securite']:
+            return self.alert_security
+        elif cat in ['finance', 'finances', 'payment', 'paiement']:
+            return self.alert_finance
+        elif cat in ['inventory', 'inventaire', 'stock']:
+            return self.alert_inventory
+        elif cat in ['education', 'academic', 'presence', 'absences']:
+            return self.alert_education
+        elif cat in ['digest', 'daily_digest']:
+            return self.daily_digest
+        return True
