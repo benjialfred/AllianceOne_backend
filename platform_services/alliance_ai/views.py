@@ -67,3 +67,67 @@ class MissionAuditView(APIView):
             })
         except ExecutionPlanModel.DoesNotExist:
             return Response({"error": "Plan not found"}, status=404)
+
+class MissionConfirmView(APIView):
+    """
+    Submits user confirmation for a sensitive step.
+    Revalidates the action hash against the Security Gate before execution.
+    """
+    authentication_classes = [AllianceTokenAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, plan_id):
+        from platform_services.alliance_ai.orchestration.state_store import StateStore
+        from platform_services.alliance_ai.gateway.gateway import _orchestrator
+        from platform_services.alliance_ai.context.context_engine import ContextEngine
+
+        step_id = request.data.get('step_id')
+        if not step_id:
+            return Response({"error": "step_id is required"}, status=400)
+
+        plan = StateStore.load_plan(plan_id)
+        if not plan:
+            return Response({"error": "Plan not found"}, status=404)
+
+        step = plan.get_step(step_id)
+        if not step:
+            return Response({"error": "Step not found"}, status=404)
+
+        action_hash = step.execution_metadata.get("action_hash")
+        if not action_hash:
+            return Response({"error": "No action hash found for confirmation"}, status=400)
+
+        # Set confirmation hash for SecurityApprovalEngine to revalidate
+        step.execution_metadata["confirmation_hash"] = action_hash
+        step.requires_confirmation = False
+        StateStore.save_plan(plan)
+
+        # Build context and resume plan through orchestrator
+        client_context = request.data.get('context', {})
+        context = ContextEngine.build_context(request.user, client_context)
+        _orchestrator.resume_plan(plan, context)
+
+        return Response({"status": "SUCCESS", "message": f"Step {step_id} confirmed and plan resumed."})
+
+class MissionCancelView(APIView):
+    """
+    Explicitly cancels an active mission.
+    """
+    authentication_classes = [AllianceTokenAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, plan_id):
+        from platform_services.alliance_ai.orchestration.state_store import StateStore
+        from platform_services.alliance_ai.orchestration.state import ExecutionStatus
+
+        plan = StateStore.load_plan(plan_id)
+        if not plan:
+            return Response({"error": "Plan not found"}, status=404)
+
+        plan.status = ExecutionStatus.CANCELLED
+        for step in plan.steps:
+            if step.status in [ExecutionStatus.PENDING, ExecutionStatus.RUNNING, ExecutionStatus.WAITING_FOR_APPROVAL]:
+                step.status = ExecutionStatus.CANCELLED
+
+        StateStore.save_plan(plan)
+        return Response({"status": "SUCCESS", "message": f"Mission {plan_id} has been cancelled."})
