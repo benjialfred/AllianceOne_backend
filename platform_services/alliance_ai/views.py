@@ -5,13 +5,18 @@ from platform_services.alliance_ai.gateway.gateway import AllianceAIGateway
 from platform_services.identity.authentication import AllianceTokenAuthentication
 from django.contrib.auth import get_user_model
 
+from platform_services.alliance_ai.models.conversation import AIConversationModel, AIMessageModel
+from platform_services.alliance_ai.models.orchestration import ExecutionPlanModel
+
 class AskAllianceAIView(APIView):
     authentication_classes = [AllianceTokenAuthentication]
     permission_classes = [IsAuthenticated]
+
     def post(self, request):
         prompt = request.data.get('prompt')
         client_context = request.data.get('context', {})
         history = request.data.get('history', [])
+        conversation_id = request.data.get('conversation_id')
 
         if not prompt:
             return Response({"error": "Prompt is required"}, status=400)
@@ -20,13 +25,83 @@ class AskAllianceAIView(APIView):
         if not user or not user.is_authenticated:
             return Response({"error": "Unauthorized. Authentication is required to use Alliance AI."}, status=401)
 
-        # Delegate to the Gateway which handles isolation, RBAC and execution
+        # 1. Resolve or create persistent conversation session
+        conversation = None
+        if conversation_id:
+            try:
+                conversation = AIConversationModel.objects.filter(id=conversation_id, user=user).first()
+            except Exception:
+                conversation = None
+
+        if not conversation:
+            clean_title = prompt.strip().replace("\n", " ")
+            if len(clean_title) > 50:
+                clean_title = clean_title[:47] + "..."
+            org_id = (
+                client_context.get('organization_id') or 
+                request.headers.get('X-Tenant-Id') or 
+                request.headers.get('x-tenant-id') or 
+                "default"
+            )
+            conversation = AIConversationModel.objects.create(
+                user=user,
+                organization_id=str(org_id),
+                title=clean_title
+            )
+        elif conversation.title == "Nouvelle session" and conversation.messages.count() == 0:
+            clean_title = prompt.strip().replace("\n", " ")
+            if len(clean_title) > 50:
+                clean_title = clean_title[:47] + "..."
+            conversation.title = clean_title
+            conversation.save(update_fields=['title'])
+
+        # 2. Persist User Message
+        user_msg = AIMessageModel.objects.create(
+            conversation=conversation,
+            sender=AIMessageModel.SENDER_USER,
+            content=prompt,
+            interaction_mode='DIRECT'
+        )
+
+        # 3. Pull recent conversation turns if history was not explicitly provided
+        if not history and conversation.messages.count() > 1:
+            prev_msgs = conversation.messages.exclude(id=user_msg.id).order_by('-created_at')[:8]
+            history = [
+                {"role": "user" if m.sender == AIMessageModel.SENDER_USER else "assistant", "content": m.content}
+                for m in reversed(list(prev_msgs))
+            ]
+
+        # 4. Delegate to the Gateway which handles isolation, RBAC and execution
         result = AllianceAIGateway.ask(
             user=user,
             prompt=prompt,
             client_context=client_context,
             history=history
         )
+
+        # 5. Persist Assistant Reply
+        res_data = result.get('data', {})
+        res_type = res_data.get('type')
+        plan_id = result.get('plan_id')
+        plan_model = ExecutionPlanModel.objects.filter(plan_id=plan_id).first() if plan_id else None
+
+        interaction_mode = 'MISSION' if res_type == 'mission_plan' else 'DIRECT'
+        content = result.get('content', '')
+
+        assistant_msg = AIMessageModel.objects.create(
+            conversation=conversation,
+            sender=AIMessageModel.SENDER_ASSISTANT,
+            content=content,
+            interaction_mode=interaction_mode,
+            mission=plan_model,
+            metadata={"plan_id": plan_id} if plan_id else {}
+        )
+
+        # 6. Return response enriched with session and message identifiers
+        result["conversation_id"] = str(conversation.id)
+        result["conversation_title"] = conversation.title
+        result["user_message_id"] = str(user_msg.id)
+        result["message_id"] = str(assistant_msg.id)
 
         return Response(result)
 
