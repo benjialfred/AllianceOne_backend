@@ -93,18 +93,27 @@ class MissionConfirmView(APIView):
         if not step:
             return Response({"error": "Step not found"}, status=404)
 
+        client_context = request.data.get('context', {})
+        context = ContextEngine.build_context(request.user, client_context)
+
         action_hash = step.execution_metadata.get("action_hash")
         if not action_hash:
-            return Response({"error": "No action hash found for confirmation"}, status=400)
+            from platform_services.alliance_ai.security.approval_engine import SecurityApprovalEngine
+            approval = SecurityApprovalEngine.evaluate(
+                tool_name=step.tool_name,
+                arguments=step.arguments,
+                context=context,
+                mission_id=plan.plan_id
+            )
+            action_hash = approval.action_hash
+            step.execution_metadata["action_hash"] = action_hash
 
         # Set confirmation hash for SecurityApprovalEngine to revalidate
         step.execution_metadata["confirmation_hash"] = action_hash
         step.requires_confirmation = False
         StateStore.save_plan(plan)
 
-        # Build context and resume plan through orchestrator
-        client_context = request.data.get('context', {})
-        context = ContextEngine.build_context(request.user, client_context)
+        # Resume plan through orchestrator
         _orchestrator.resume_plan(plan, context)
 
         return Response({"status": "SUCCESS", "message": f"Step {step_id} confirmed and plan resumed."})
