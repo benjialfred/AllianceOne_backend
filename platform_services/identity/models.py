@@ -1,6 +1,6 @@
 import uuid
 
-from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin
+from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin, BaseUserManager
 from django.db import models
 
 
@@ -125,6 +125,28 @@ class Address(UniversalObject):
     organization = models.ForeignKey(Organization, null=True, blank=True, on_delete=models.CASCADE, related_name="addresses")
 
 
+class UserManager(BaseUserManager):
+    def get_by_natural_key(self, username):
+        return self.get(**{self.model.USERNAME_FIELD: username})
+
+    def create_user(self, email, password=None, **extra_fields):
+        if not email:
+            raise ValueError("L'adresse email est requise.")
+        email = self.normalize_email(email)
+        user = self.model(email=email, **extra_fields)
+        if password:
+            user.set_password(password)
+        else:
+            user.set_unusable_password()
+        user.save(using=self._db)
+        return user
+
+    def create_superuser(self, email, password=None, **extra_fields):
+        extra_fields.setdefault('is_staff', True)
+        extra_fields.setdefault('is_superuser', True)
+        return self.create_user(email, password, **extra_fields)
+
+
 class User(AbstractBaseUser, PermissionsMixin, UniversalObject):
     """
     Alliance ID : Modèle Utilisateur global.
@@ -136,6 +158,8 @@ class User(AbstractBaseUser, PermissionsMixin, UniversalObject):
 
     # Lien vers l'Objet Universel Person
     person = models.OneToOneField(Person, on_delete=models.PROTECT, null=True, blank=True, related_name="user_account")
+
+    objects = UserManager()
 
     USERNAME_FIELD = 'email'
 

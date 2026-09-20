@@ -24,8 +24,27 @@ class SimpleLoginView(APIView):
                     onboarding_completed = True
 
             first_name = "Admin"
-            if user.email:
+            last_name = "Alliance"
+            if user.person:
+                first_name = user.person.first_name
+                last_name = user.person.last_name
+            elif user.email:
                 first_name = user.email.split('@')[0].capitalize()
+
+            is_hyperadmin = False
+            roles = ["ADMINISTRATOR"]
+            if user.is_superuser or user.is_staff:
+                is_hyperadmin = True
+                roles = ["HYPERADMIN", "ADMINISTRATOR"]
+            else:
+                for m in Membership.objects.filter(user=user).select_related('role'):
+                    if m.role.name.upper() == 'HYPERADMIN':
+                        is_hyperadmin = True
+                        roles = ["HYPERADMIN", "ADMINISTRATOR"]
+                        break
+
+            if is_hyperadmin:
+                onboarding_completed = True
 
             return Response({
                 "access": "dev-token-local",
@@ -34,8 +53,9 @@ class SimpleLoginView(APIView):
                     "id": str(user.id),
                     "email": user.email,
                     "first_name": first_name,
-                    "last_name": "Alliance",
-                    "roles": ["ADMINISTRATOR"],
+                    "last_name": last_name,
+                    "roles": roles,
+                    "is_hyperadmin": is_hyperadmin,
                     "permissions": ["*"],
                     "onboarding_completed": onboarding_completed,
                 }
