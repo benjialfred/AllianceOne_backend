@@ -29,10 +29,29 @@ class ToolRegistry:
     def get_all_tools_schema(cls, context: AllianceAIContext) -> List[Dict[str, Any]]:
         """
         Returns JSON schema representations of tools the user is actually allowed to execute.
+        Checks both RBAC permissions and Module Installations.
         """
         allowed_tools = []
+        
+        # Avoid circular imports at module level
+        try:
+            from platform_services.alliance_modules.models import ModuleInstallation
+            installed_modules = set(
+                ModuleInstallation.objects.filter(
+                    organization=context.organization, 
+                    status='ACTIVE'
+                ).values_list('module__slug', flat=True)
+            )
+        except Exception:
+            # Fallback if alliance_modules is not ready or context is missing org
+            installed_modules = set()
+
         for tool in cls._tools.values():
-            # Filter tools by permissions
+            # 1. Module Awareness Check
+            if tool.module_slug and tool.module_slug not in installed_modules:
+                continue
+
+            # 2. RBAC Permissions Check
             if all(context.has_permission(p) for p in tool.required_permissions):
                 allowed_tools.append({
                     "type": "function",
@@ -50,7 +69,19 @@ class ToolRegistry:
         Executes a tool within the secure bounds of the context.
         """
         tool = cls.get_tool(name)
-        
+        # Module Check
+        if tool.module_slug:
+            try:
+                from platform_services.alliance_modules.models import ModuleInstallation
+                if not ModuleInstallation.objects.filter(
+                    organization=context.organization,
+                    module__slug=tool.module_slug,
+                    status='ACTIVE'
+                ).exists():
+                    raise PermissionDeniedError(f"Module '{tool.module_slug}' is not installed or active.")
+            except ImportError:
+                pass
+
         # Security Check
         for perm in tool.required_permissions:
             if not context.has_permission(perm):

@@ -78,6 +78,8 @@ INSTALLED_APPS = [
     'platform_services.founder',
     'platform_services.alliance_ai',
     'platform_services.telegram',
+    'platform_services.payments',
+    'platform_services.alliance_modules',
 ]
 
 MIDDLEWARE = [
@@ -216,3 +218,7 @@ TELEGRAM_COMMUNITY_URL = env('TELEGRAM_COMMUNITY_URL', default='https://t.me/all
 TELEGRAM_CHANNEL_URL = env('TELEGRAM_CHANNEL_URL', default='https://t.me/allianceonechannels')
 TELEGRAM_CHANNEL_ID = env('TELEGRAM_CHANNEL_ID', default='@allianceonechannels')
 TELEGRAM_COMMUNITY_ID = env('TELEGRAM_COMMUNITY_ID', default='@allianceonecommunity')
+
+# Nelsius Payment Integration
+NELSIUS_API_BASE_URL = env('NELSIUS_API_BASE_URL', default='http://localhost:8000/api/v1')
+NELSIUS_SECRET_KEY = env('NELSIUS_SECRET_KEY', default='sk_test_dev_key')

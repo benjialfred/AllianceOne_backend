@@ -60,6 +60,7 @@ search_students_tool = AIToolDefinition(
     },
     required_permissions=["education.student.read"],
     risk_level=RiskLevel.LOW,
+    module_slug="education",
     handler=handle_search_students
 )
 

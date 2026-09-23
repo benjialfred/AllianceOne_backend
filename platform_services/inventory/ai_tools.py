@@ -31,8 +31,9 @@ update_stock_tool = AIToolDefinition(
             "data": {"type": "object"}
         }
     },
-    required_permissions=["inventory.stock.write"],
+    required_permissions=["inventory.stock.update"],
     risk_level=RiskLevel.MEDIUM,
+    module_slug="inventory",
     handler=handle_update_stock
 )
 

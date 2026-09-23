@@ -31,6 +31,7 @@ class AIToolPolicy:
     mutation: bool = False
     requires_confirmation: bool = False 
     object_scope: str = "organization"
+    module_slug: str = None  # NEW: The slug of the module this tool belongs to
     handler: Callable = None
 
 # For backwards compatibility during transition
