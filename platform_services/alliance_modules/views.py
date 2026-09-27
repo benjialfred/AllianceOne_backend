@@ -33,7 +33,8 @@ class ModuleInstallationViewSet(viewsets.ReadOnlyModelViewSet):
         if hasattr(self.request, 'organization') and self.request.organization:
             return ModuleInstallation.objects.filter(organization=self.request.organization)
         # Fallback: get installations for all organizations the user is a member of
-        return ModuleInstallation.objects.filter(organization__memberships__user=self.request.user).distinct()
+        user_org_ids = self.request.user.memberships.values_list('organization_id', flat=True)
+        return ModuleInstallation.objects.filter(organization_id__in=user_org_ids).distinct()
 
 class InstallModuleView(views.APIView):
     """
@@ -51,13 +52,23 @@ class InstallModuleView(views.APIView):
         except Module.DoesNotExist:
             return Response({"error": "Module not found"}, status=status.HTTP_404_NOT_FOUND)
 
-        organization = getattr(request, 'organization', None)
+        # Get organization from tenant middleware or user
+        organization = getattr(request, 'tenant', None)
         if not organization:
-            # Fallback
-            membership = request.user.memberships.first()
-            if not membership:
-                return Response({"error": "User has no organization"}, status=status.HTTP_403_FORBIDDEN)
-            organization = membership.organization
+            organization = getattr(request, 'organization', None)
+        
+        if not organization:
+            # Fallback to memberships
+            if hasattr(request.user, 'memberships') and request.user.memberships.exists():
+                organization = request.user.memberships.first().organization
+            elif hasattr(request.user, 'organizations') and request.user.organizations.exists():
+                organization = request.user.organizations.first()
+            else:
+                from platform_services.identity.models import Organization
+                organization, _ = Organization.objects.get_or_create(
+                    name="Alliance One Default",
+                    defaults={"legal_name": "Alliance One Default Inc."}
+                )
 
         # Check if already installed
         if ModuleInstallation.objects.filter(organization=organization, module=module).exists():

@@ -174,6 +174,14 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 # Alliance ID Custom User Model
 AUTH_USER_MODEL = 'identity.User'
 
+# Email Configuration for 2FA
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = 'benjaminadzessa@gmail.com'
+EMAIL_HOST_PASSWORD = 'bldk klxd olxc dchx'
+
 # CORS
 from corsheaders.defaults import default_headers
 
@@ -221,4 +229,4 @@ TELEGRAM_COMMUNITY_ID = env('TELEGRAM_COMMUNITY_ID', default='@allianceonecommun
 
 # Nelsius Payment Integration
 NELSIUS_API_BASE_URL = env('NELSIUS_API_BASE_URL', default='http://localhost:8000/api/v1')
-NELSIUS_SECRET_KEY = env('NELSIUS_SECRET_KEY', default='sk_test_dev_key')
+NELSIUS_SECRET_KEY = env('NELSIUS_SECRET_KEY', default='sk_test_nelsius_dummy_key')
