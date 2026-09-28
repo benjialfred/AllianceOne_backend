@@ -215,3 +215,61 @@ class MissionCancelView(APIView):
 
         StateStore.save_plan(plan)
         return Response({"status": "SUCCESS", "message": f"Mission {plan_id} has been cancelled."})
+
+from rest_framework.permissions import AllowAny
+
+class PublicAskAllianceAIView(APIView):
+    """
+    Public unauthenticated endpoint for Alliance AI Copilot on the landing page.
+    It can answer questions about the platform, but cannot execute tasks or missions.
+    """
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        prompt = request.data.get('prompt')
+        history = request.data.get('history', [])
+
+        if not prompt:
+            return Response({"error": "Prompt is required"}, status=400)
+
+        from platform_services.alliance_ai.models.providers import GeminiProvider
+        provider = GeminiProvider()
+
+        system_prompt = (
+            "Tu es Alliance AI, l'assistant public de la plateforme d'infrastructure numérique Alliance One. "
+            "Ton rôle est d'accueillir les visiteurs, d'expliquer ce qu'est Alliance One, ses modules, "
+            "sa tarification, sa sécurité, et son réseau. "
+            "Tu DOIS répondre à toutes les questions d'ordre général ou informatif de manière professionnelle, "
+            "claire et précise. "
+            "CEPENDANT, tu n'es pas connecté au compte de l'utilisateur. Tu as STRICTEMENT INTERDICTION "
+            "d'exécuter des tâches, missions, ou de gérer des modules. Si l'utilisateur te demande de "
+            "gérer un module, créer une ressource, faire un rapport ou exécuter une action système, "
+            "tu dois gentiment refuser et lui demander de se connecter à son espace sécurisé pour utiliser "
+            "l'Intelligence Opérationnelle."
+        )
+
+        formatted_history = []
+        for msg in history:
+            formatted_history.append({
+                "role": msg.get("role", "user"),
+                "content": msg.get("content", "")
+            })
+
+        formatted_history.append({
+            "role": "user",
+            "content": prompt
+        })
+
+        try:
+            response_text = provider.generate(
+                prompt=str(formatted_history),
+                system_instruction=system_prompt,
+                tools=[]
+            )
+            
+            return Response({
+                "status": "SUCCESS",
+                "answer": response_text
+            })
+        except Exception as e:
+            return Response({"error": str(e)}, status=500)

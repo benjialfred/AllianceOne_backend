@@ -1,8 +1,9 @@
 from django.urls import path
-from .views import AskAllianceAIView, MissionAuditView, MissionConfirmView, MissionCancelView
+from .views import AskAllianceAIView, MissionAuditView, MissionConfirmView, MissionCancelView, PublicAskAllianceAIView
 from .conversation_views import AIConversationListView, AIConversationDetailView
 
 urlpatterns = [
+    path('public-ask/', PublicAskAllianceAIView.as_view(), name='ai-public-ask'),
     path('ask/', AskAllianceAIView.as_view(), name='ai-ask'),
     path('conversations/', AIConversationListView.as_view(), name='ai-conversations-list'),
     path('conversations/<str:conversation_id>/', AIConversationDetailView.as_view(), name='ai-conversations-detail'),
