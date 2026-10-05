@@ -1,5 +1,6 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
+import requests
 from django.contrib.auth import authenticate
 from .models import User, Organization, OrganizationProfile, Membership
 from .jwt_utils import decode_google_jwt
@@ -264,3 +265,109 @@ class RegisterView(APIView):
             pass
 
         return Response({"requires_2fa": True})
+
+class GithubAuthView(APIView):
+    """
+    Point de terminaison OAuth Github.
+    POST /api/core/auth/github/
+    """
+    authentication_classes = []
+    permission_classes = []
+
+    def post(self, request):
+        code = request.data.get('code')
+        if not code:
+            return Response({"detail": "Code GitHub manquant"}, status=400)
+
+        client_id = 'Ov23lia1vLDgsnmCaQOY'
+        client_secret = '5135544e13c23dacc93273a2988561d90b66803e'
+
+        # Exchange code for token
+        token_response = requests.post(
+            'https://github.com/login/oauth/access_token',
+            data={
+                'client_id': client_id,
+                'client_secret': client_secret,
+                'code': code,
+            },
+            headers={'Accept': 'application/json'}
+        )
+        
+        if not token_response.ok:
+            return Response({"detail": "Échec de l'authentification GitHub"}, status=400)
+
+        token_data = token_response.json()
+        access_token = token_data.get('access_token')
+
+        if not access_token:
+            return Response({"detail": "Impossible d'obtenir le token GitHub"}, status=400)
+
+        # Get user info
+        user_response = requests.get(
+            'https://api.github.com/user',
+            headers={'Authorization': f'Bearer {access_token}'}
+        )
+        if not user_response.ok:
+            return Response({"detail": "Impossible de récupérer le profil GitHub"}, status=400)
+
+        github_user = user_response.json()
+        email = github_user.get('email')
+
+        # If email is private, we need to fetch it from /user/emails
+        if not email:
+            emails_response = requests.get(
+                'https://api.github.com/user/emails',
+                headers={'Authorization': f'Bearer {access_token}'}
+            )
+            if emails_response.ok:
+                emails = emails_response.json()
+                primary_email = next((e for e in emails if e.get('primary')), None)
+                if primary_email:
+                    email = primary_email.get('email')
+                elif emails:
+                    email = emails[0].get('email')
+        
+        if not email:
+            return Response({"detail": "Aucun email trouvé sur ce compte GitHub"}, status=400)
+
+        email = email.lower()
+        name_parts = github_user.get('name', '').split(' ')
+        first_name = name_parts[0] if name_parts and name_parts[0] else github_user.get('login', '')
+        last_name = name_parts[1] if len(name_parts) > 1 else 'GitHub'
+
+        user, created = User.objects.get_or_create(
+            email=email,
+            defaults={
+                "is_active": True,
+            }
+        )
+
+        is_hyperadmin = False
+        roles = ["ADMINISTRATOR"]
+        if user.is_superuser or user.is_staff:
+            is_hyperadmin = True
+            roles = ["HYPERADMIN", "ADMINISTRATOR"]
+        else:
+            for m in Membership.objects.filter(user=user).select_related('role'):
+                if m.role and m.role.name.upper() == 'HYPERADMIN':
+                    is_hyperadmin = True
+                    roles = ["HYPERADMIN", "ADMINISTRATOR"]
+                    break
+
+        onboarding_completed = True
+
+        return Response({
+            "access": "github-session-access",
+            "refresh": "github-session-refresh",
+            "user": {
+                "id": str(user.id),
+                "email": user.email,
+                "first_name": first_name,
+                "last_name": last_name,
+                "roles": roles,
+                "is_hyperadmin": is_hyperadmin,
+                "permissions": ["*"],
+                "onboarding_completed": onboarding_completed,
+            }
+        })
+

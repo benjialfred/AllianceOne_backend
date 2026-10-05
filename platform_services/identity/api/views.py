@@ -178,6 +178,8 @@ class WorkspaceViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
     serializer_class = WorkspaceSerializer
 
 
+from rest_framework.decorators import action
+
 class UserViewSet(viewsets.ModelViewSet):
     """
     Utilisateurs globaux de la plateforme.
@@ -186,6 +188,22 @@ class UserViewSet(viewsets.ModelViewSet):
     """
     queryset = User.objects.all()
     serializer_class = UserSerializer
+
+    @action(detail=False, methods=['get', 'put', 'patch'])
+    def me(self, request):
+        if not request.user.is_authenticated:
+            return Response({"detail": "Non authentifié."}, status=status.HTTP_401_UNAUTHORIZED)
+        
+        if request.method == 'GET':
+            serializer = self.get_serializer(request.user)
+            return Response(serializer.data)
+        
+        serializer = self.get_serializer(request.user, data=request.data, partial=(request.method == 'PATCH'))
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 
 
 class PersonViewSet(viewsets.ModelViewSet):

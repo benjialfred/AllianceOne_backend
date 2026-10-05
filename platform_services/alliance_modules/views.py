@@ -19,6 +19,7 @@ class ModuleViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = ModuleSerializer
     permission_classes = [IsAuthenticated]
     lookup_field = 'slug'
+    pagination_class = None
 
 class ModuleInstallationViewSet(viewsets.ReadOnlyModelViewSet):
     """
@@ -26,6 +27,7 @@ class ModuleInstallationViewSet(viewsets.ReadOnlyModelViewSet):
     """
     serializer_class = ModuleInstallationSerializer
     permission_classes = [IsAuthenticated]
+    pagination_class = None
 
     def get_queryset(self):
         # Assumes request.organization is set by a middleware (e.g. TenantMiddleware)
