@@ -123,8 +123,9 @@ class InstallModuleView(views.APIView):
         )
 
         # 3. Call Nelsius
-        return_url = f"http://localhost:5173/app/marketplace/callback?ref={merchant_reference}"
-        cancel_url = f"http://localhost:5173/app/marketplace"
+        frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:5173')
+        return_url = f"{frontend_url}/app/marketplace/callback?ref={merchant_reference}"
+        cancel_url = f"{frontend_url}/app/marketplace"
         
         provider = NelsiusProvider()
         try:
