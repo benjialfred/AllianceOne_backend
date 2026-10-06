@@ -10,7 +10,7 @@ class IzyBoostAPIError(Exception):
 class IzyBoostService:
     def __init__(self):
         self.api_key = getattr(settings, 'IZYBOOST_API_KEY', 'izy_live_aa0e13aa365ed1fb68d290c47802876c')
-        self.base_url = "https://izyboost.com/api/v2"
+        self.base_url = "https://izyboost.site/api/v2"
 
     def _post(self, action: str, data: dict = None):
         if data is None:
