@@ -23,7 +23,7 @@ class BoostServicesView(views.APIView):
     """
     Liste les services IzyBoost disponibles avec les tarifs convertis et margés.
     """
-    permission_classes = [IsAuthenticated]
+    permission_classes = [] # AllowAny
 
     def get(self, request):
         # On utilise le cache pour ne pas spammer l'API IzyBoost à chaque chargement de page
