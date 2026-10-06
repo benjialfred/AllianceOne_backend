@@ -41,6 +41,7 @@ urlpatterns = [
     path('api/core/ai/', include('platform_services.alliance_ai.urls')),
     path('api/core/payments/', include('platform_services.payments.urls')),
     path('api/core/modules/', include('platform_services.alliance_modules.urls')),
+    path('api/boost/', include('platform_services.alliance_boost.urls')),
     path('api/education/', include('platform_services.education.api.urls')),
     path('api/inventory/', include('platform_services.inventory.urls')),
     path('api/library/', include('platform_services.library.urls')),

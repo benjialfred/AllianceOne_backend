@@ -62,6 +62,7 @@ INSTALLED_APPS = [
     'platform_services.cloud',
     'platform_services.communication',
     'platform_services.dashboards',
+    'platform_services.alliance_boost',
     'platform_services.education.students',
     'platform_services.education.teachers',
     'platform_services.education.classes',
