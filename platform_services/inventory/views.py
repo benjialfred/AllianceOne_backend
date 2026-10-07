@@ -43,7 +43,7 @@ class WarehouseViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
     @action(detail=True, methods=['get'])
     def stock_summary(self, request, pk=None):
         warehouse = self.get_object()
-        stocks = ProductStock.objects.filter(warehouse=warehouse, organization=request.tenant).select_related('product', 'product__unit', 'location')
+        stocks = ProductStock.objects.filter(warehouse=warehouse, organization=self.get_tenant()).select_related('product', 'product__unit', 'location')
         serializer = ProductStockSerializer(stocks, many=True)
         return Response(serializer.data)
 

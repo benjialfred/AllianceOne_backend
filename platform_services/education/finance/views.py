@@ -59,8 +59,9 @@ class ReceiptPdfView(View):
         )
         
         school_name = "ALLIANCE ONE"
-        if hasattr(request, 'tenant') and request.tenant:
-            school_name = request.tenant.name.upper()
+        tenant = self.get_tenant()
+        if tenant:
+            school_name = tenant.name.upper()
 
         elements.append(Paragraph(f"<b>{school_name}</b>", title_style))
         elements.append(Paragraph("REÇU DE PAIEMENT", ParagraphStyle('Sub', parent=title_style, fontSize=12, textColor=colors.HexColor('#4b5563'))))

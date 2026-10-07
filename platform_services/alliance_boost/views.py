@@ -51,7 +51,9 @@ class BoostServicesView(views.APIView):
         except IzyBoostAPIError as e:
             return Response({"error": str(e)}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
 
-class BoostOrderViewSet(viewsets.ModelViewSet):
+from platform_services.identity.mixins import TenantQuerySetMixin
+
+class BoostOrderViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
     """
     Gère les commandes de boost de l'utilisateur.
     """
@@ -59,7 +61,9 @@ class BoostOrderViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        return BoostOrder.objects.filter(user=self.request.user).order_by('-created_at')
+        # TenantQuerySetMixin filtres automatiquement par organisation
+        # On ajoute juste le filtre par utilisateur et l'ordre
+        return super().get_queryset().filter(user=self.request.user).order_by('-created_at')
 
     def create(self, request, *args, **kwargs):
         serializer = CreateBoostOrderSerializer(data=request.data)
@@ -93,9 +97,7 @@ class BoostOrderViewSet(viewsets.ModelViewSet):
         selling_price_xaf = calculate_price_xaf(service_info['rate'], quantity)
 
         # 2. Créer la commande locale (Statut PENDING)
-        organization = getattr(request, 'tenant', None) or getattr(request, 'organization', None)
-        if not organization and hasattr(request.user, 'organizations') and request.user.organizations.exists():
-             organization = request.user.organizations.first()
+        organization = self.get_tenant()
 
         order = BoostOrder.objects.create(
             organization=organization,

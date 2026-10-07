@@ -47,7 +47,7 @@ class FinancialAccountViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
     def transactions(self, request, pk=None):
         account = self.get_object()
         txs = Transaction.objects.filter(
-            organization=request.tenant,
+            organization=self.get_tenant(),
             account=account
         ).order_by('-date', '-created_at')[:50]
         serializer = TransactionSerializer(txs, many=True)
@@ -270,7 +270,7 @@ class TontineRoundViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
         if not data.get('beneficiary'):
             data['beneficiary'] = round_obj.beneficiary_id
 
-        payout = FinanceService.record_tontine_payout(request.tenant, data, user=request.user)
+        payout = FinanceService.record_tontine_payout(self.get_tenant(), data, user=request.user)
         return Response(TontinePayoutSerializer(payout).data, status=status.HTTP_201_CREATED)
 
 

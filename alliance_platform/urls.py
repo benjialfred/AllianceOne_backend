@@ -20,6 +20,7 @@ from django.http import JsonResponse
 from django.conf import settings
 from django.conf.urls.static import static
 from platform_services.identity.auth_views import SimpleLoginView, GoogleAuthView, RegisterView, Verify2FAView, GithubAuthView
+from .views import contact_api_view
 
 def api_root(request):
     return JsonResponse({
@@ -36,6 +37,7 @@ urlpatterns = [
     path('api/core/auth/google/', GoogleAuthView.as_view(), name='auth-google'),
     path('api/core/auth/github/', GithubAuthView.as_view(), name='auth-github'),
     path('api/core/auth/register/', RegisterView.as_view(), name='auth-register'),
+    path('api/contact/', contact_api_view, name='api-contact'),
     path('api/core/identity/', include('platform_services.identity.urls')),
     path('api/core/dashboards/', include('platform_services.dashboards.api.urls')),
     path('api/core/ai/', include('platform_services.alliance_ai.urls')),

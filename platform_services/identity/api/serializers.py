@@ -24,11 +24,19 @@ class PersonSerializer(serializers.ModelSerializer):
 
 class UserSerializer(serializers.ModelSerializer):
     person = PersonSerializer(read_only=True)
+    first_name = serializers.SerializerMethodField()
+    last_name = serializers.SerializerMethodField()
 
     class Meta:
         model = User
-        fields = ['id', 'email', 'is_active', 'person', 'created_at']
+        fields = ['id', 'email', 'is_active', 'person', 'preferences', 'created_at', 'first_name', 'last_name']
         read_only_fields = ['id', 'created_at']
+
+    def get_first_name(self, obj):
+        return obj.person.first_name if obj.person else ""
+
+    def get_last_name(self, obj):
+        return obj.person.last_name if obj.person else ""
 
 
 class RoleSerializer(serializers.ModelSerializer):

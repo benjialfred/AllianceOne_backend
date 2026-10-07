@@ -35,8 +35,11 @@ class TrackEventView(APIView):
         if not event_type or event_type not in dict(FounderActivityEvent.EVENT_TYPES).keys():
             return Response({"detail": "Invalid event_type"}, status=status.HTTP_400_BAD_REQUEST)
         
-        # Check tenant context if available (from headers/middleware usually, but here we can extract if provided)
-        organization = request.tenant if hasattr(request, 'tenant') else None
+        from platform_services.identity.models import Organization
+        tenant_id = request.META.get('HTTP_X_TENANT_ID')
+        organization = None
+        if tenant_id:
+            organization = Organization.objects.filter(id=tenant_id).first()
         
         session_id = request.data.get('session_id')
         user = request.user if request.user.is_authenticated else None

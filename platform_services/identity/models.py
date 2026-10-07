@@ -159,6 +159,9 @@ class User(AbstractBaseUser, PermissionsMixin, UniversalObject):
     # Lien vers l'Objet Universel Person
     person = models.OneToOneField(Person, on_delete=models.PROTECT, null=True, blank=True, related_name="user_account")
 
+    # Paramètres de l'application (Thème, Langue, etc.)
+    preferences = models.JSONField(default=dict, blank=True, help_text="User UI/UX preferences (theme, language, etc.)")
+
     objects = UserManager()
 
     USERNAME_FIELD = 'email'

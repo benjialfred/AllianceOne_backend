@@ -2,7 +2,7 @@ from django.utils import timezone
 from rest_framework import viewsets, status
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
-from platform_services.identity.models import Organization, Workspace, User, Person, Role, OrganizationProfile
+from platform_services.identity.models import Organization, Workspace, User, Person, Role, OrganizationProfile, Membership, Team
 from platform_services.identity.mixins import TenantQuerySetMixin
 from .serializers import (
     OrganizationSerializer, WorkspaceSerializer, UserSerializer,
@@ -109,9 +109,6 @@ def onboarding_submit(request):
                 org = first_m.organization
 
     if not org:
-        org = Organization.objects.first()
-
-    if not org:
         org = Organization.objects.create(
             name=data['organization_name'],
             legal_name=data.get('legal_name', ''),
@@ -134,6 +131,22 @@ def onboarding_submit(request):
             defaults={"description": "Super Administrateur de l'organisation"}
         )
         Membership.objects.get_or_create(user=request.user, organization=org, defaults={"role": role})
+
+    # Créer un Workspace par défaut (Siagège social / Principal)
+    workspace, _ = Workspace.objects.get_or_create(
+        organization=org,
+        name="Siège Social",
+        defaults={"slug": "siege-social"}
+    )
+
+    # Créer une équipe de direction par défaut
+    team, _ = Team.objects.get_or_create(
+        organization=org,
+        workspace=workspace,
+        name="Direction"
+    )
+    if request.user and request.user.is_authenticated:
+        team.members.add(request.user)
     
     # Créer ou mettre à jour le profil avec onboarding_completed = True
     profile, created = OrganizationProfile.objects.update_or_create(
@@ -198,6 +211,28 @@ class UserViewSet(viewsets.ModelViewSet):
             serializer = self.get_serializer(request.user)
             return Response(serializer.data)
         
+        if request.method in ['PUT', 'PATCH']:
+            # Extraire les champs first_name et last_name pour mettre à jour la Person liée
+            first_name = request.data.get('first_name')
+            last_name = request.data.get('last_name')
+            
+            user = request.user
+            if first_name is not None or last_name is not None:
+                if not user.person:
+                    # Créer une nouvelle personne si elle n'existe pas
+                    person = Person.objects.create(
+                        first_name=first_name or "",
+                        last_name=last_name or ""
+                    )
+                    user.person = person
+                    user.save()
+                else:
+                    if first_name is not None:
+                        user.person.first_name = first_name
+                    if last_name is not None:
+                        user.person.last_name = last_name
+                    user.person.save()
+
         serializer = self.get_serializer(request.user, data=request.data, partial=(request.method == 'PATCH'))
         if serializer.is_valid():
             serializer.save()

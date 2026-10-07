@@ -93,7 +93,6 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'platform_services.identity.middleware.TenantMiddleware',
     'alliance_platform.middleware.ErrorTrackingMiddleware',
 ]
 
@@ -231,3 +230,6 @@ TELEGRAM_COMMUNITY_ID = env('TELEGRAM_COMMUNITY_ID', default='@allianceonecommun
 # Nelsius Payment Integration
 NELSIUS_API_BASE_URL = env('NELSIUS_API_BASE_URL', default='http://localhost:8000/api/v1')
 NELSIUS_SECRET_KEY = env('NELSIUS_SECRET_KEY', default='sk_test_nelsius_dummy_key')
+
+# Frontend URL
+FRONTEND_URL = env('FRONTEND_URL', default='http://localhost:5173')
